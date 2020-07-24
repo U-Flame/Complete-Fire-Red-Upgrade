@@ -453,7 +453,7 @@ Flash
 Psywave
 
 #org @NAME_SPLASH
-Splash
+???
 
 #org @NAME_ACID_ARMOR
 Acid Armor
@@ -1881,7 +1881,7 @@ Zing Zap
 Elec Terrain
 
 #org @NAME_GRAS_TERRAIN
-Gras Terrain
+GrassTerrain
 
 #org @NAME_MIST_TERRAIN
 Mist Terrain

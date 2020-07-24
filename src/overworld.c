@@ -2647,7 +2647,7 @@ void PlayerAvatarTransition_HandleUnderwater(void)
 {
 	struct EventObject* player = &gEventObjects[GetPlayerMapObjId()];
 
-	EventObjectSetGraphicsId(player, GetPlayerAvatarGraphicsIdByStateId(PLAYER_AVATAR_STATE_UNDERWATER));
+    EventObjectSetGraphicsId(player, GetPlayerAvatarGraphicsIdByStateId(PLAYER_AVATAR_STATE_UNDERWATER));
 	EventObjectTurn(player, player->movementDirection);
 	SetPlayerAvatarStateMask(PLAYER_AVATAR_FLAG_UNDERWATER);
 
