@@ -1,7 +1,9 @@
 #include "defines.h"
 #include "defines_battle.h"
-#include "../include/battle_gfx_sfx_util.h"
 #include "../include/battle_anim.h"
+#include "../include/battle_interface.h"
+#include "../include/battle_gfx_sfx_util.h"
+#include "../include/decompress.h"
 #include "../include/event_data.h"
 #include "../include/gpu_regs.h"
 #include "../include/random.h"
@@ -19,6 +21,12 @@
 battle_anims.c
 	Functions and structures to modify attack animations.
 */
+
+
+#define gMonFrontPicTable ((const struct CompressedSpriteSheet*) *((u32*) 0x8000128))
+#define gMonBackPicTable ((const struct CompressedSpriteSheet*) *((u32*) 0x800012C))
+#define gMonFrontPicCoords ((const struct MonCoords*) *((u32*) 0x8011F4C))
+#define gMonBackPicCoords ((const struct MonCoords*) *((u32*) 0x8074634))
 
 extern const u8* sBattleAnimScriptPtr;
 extern u16 sAnimMoveIndex;
@@ -79,6 +87,40 @@ const union AnimCmd *const gAnimCmdPowerWhip[] =
 {
 	sAnimCmdPowerWhipOnPlayer,
 	sAnimCmdPowerWhipOnOpponent,
+};
+
+static const union AnimCmd sAnimCmdQuickGuardLeft[] =
+{
+	ANIMCMD_END,
+};
+
+static const union AnimCmd sAnimCmdQuickGuardRight[] =
+{
+	ANIMCMD_FRAME(0, 1, .hFlip = TRUE),
+	ANIMCMD_END,
+};
+
+const union AnimCmd *const gAnimCmdTable_QuickGuard[] =
+{
+	sAnimCmdQuickGuardLeft,
+	sAnimCmdQuickGuardRight,
+};
+
+static const union AnimCmd sAnimCmdDreepyMissilePlayer[] =
+{
+	ANIMCMD_END,
+};
+
+static const union AnimCmd sAnimCmdDreepyMissileOpponent[] =
+{
+	ANIMCMD_FRAME(16, 1),
+	ANIMCMD_END,
+};
+
+const union AnimCmd *const gAnimCmdTable_DreepyMissile[] =
+{
+	sAnimCmdDreepyMissilePlayer,
+	sAnimCmdDreepyMissileOpponent,
 };
 
 const struct OamData gPoisonColumnOam =
@@ -267,6 +309,24 @@ const union AffineAnimCmd* const gSpriteAffineAnimTable_StonePillar[] =
 	sSpriteAffineAnim_StonePillarFallRight,
 };
 
+static const union AffineAnimCmd sSpriteAffineAnim_VineLashLeft[] =
+{
+	AFFINEANIMCMD_FRAME(256, 256, 0, 1), //Double sprite size
+	AFFINEANIMCMD_END,
+};
+
+static const union AffineAnimCmd sSpriteAffineAnim_VineLashRight[] =
+{
+	AFFINEANIMCMD_FRAME(-256 - 256 - 256, 256, 0, 1), //Double sprite size
+	AFFINEANIMCMD_END,
+};
+
+const union AffineAnimCmd* const gSpriteAffineAnimTable_VineLash[] =
+{
+	sSpriteAffineAnim_VineLashLeft,
+	sSpriteAffineAnim_VineLashRight,
+};
+
 static const union AnimCmd sAnimCmdGrowingMushroom[] =
 {
 	ANIMCMD_FRAME(0, 3),
@@ -308,6 +368,42 @@ static const union AnimCmd sAnimCmdSnipeShot[] =
 const union AnimCmd *const gAnimCmdTable_SnipeShot[] =
 {
 	sAnimCmdSnipeShot,
+};
+
+static const union AnimCmd sAnimCmdSmallRock[] =
+{
+	ANIMCMD_FRAME(4, 1),
+	ANIMCMD_END,
+};
+
+const union AnimCmd *const gAnimCmdTable_SmallRock[] =
+{
+	sAnimCmdSmallRock,
+};
+
+static const union AnimCmd sAnimCmdHoopaRing[] =
+{
+	ANIMCMD_FRAME(0, 8),
+	ANIMCMD_FRAME(16, 8),
+	ANIMCMD_FRAME(32, 8),
+	ANIMCMD_FRAME(48, 8),
+	ANIMCMD_JUMP(0)
+};
+
+const union AnimCmd *const gAnimCmdTable_HoopaRing[] =
+{
+	sAnimCmdHoopaRing,
+};
+
+static const union AffineAnimCmd sSpriteAffineAnim_HoopaRing[] =
+{
+	AFFINEANIMCMD_FRAME(4, 4, 10, 1), //Grow & Spin
+	AFFINEANIMCMD_JUMP(0),
+};
+
+const union AffineAnimCmd* const gSpriteAffineAnimTable_HoopaRing[] =
+{
+	sSpriteAffineAnim_HoopaRing,
 };
 
 static const union AffineAnimCmd sSpriteAffineAnim_GrowingRing[] =
@@ -552,6 +648,30 @@ const union AffineAnimCmd* const gSpriteAffineAnimTable_FeintFist[] =
 	sSpriteAffineAnim_FeintFist,
 };
 
+static const union AffineAnimCmd sSpriteAffineAnim_MachPunchFist[] =
+{
+	AFFINEANIMCMD_FRAME(256, 256, 0, 1), //Double sprite size
+	AFFINEANIMCMD_FRAME(-32, -32, 4, 8),
+	AFFINEANIMCMD_END,
+};
+
+const union AffineAnimCmd* const gSpriteAffineAnimTable_MachPunchFist[] =
+{
+	sSpriteAffineAnim_MachPunchFist,
+};
+
+static const union AffineAnimCmd sSpriteAffineAnim_DrainPunchFist[] =
+{
+	AFFINEANIMCMD_FRAME(256, 256, 0, 1), //Double sprite size
+	AFFINEANIMCMD_FRAME(-32, -32, 0, 8),
+	AFFINEANIMCMD_END,
+};
+
+const union AffineAnimCmd* const gSpriteAffineAnimTable_DrainPunchFist[] =
+{
+	sSpriteAffineAnim_DrainPunchFist,
+};
+
 static const union AffineAnimCmd sSpriteAffineAnim_MudBombBall[] =
 {
 	AFFINEANIMCMD_FRAME(0, -8, -4, 4), //Compress Vertically
@@ -599,6 +719,35 @@ static const union AffineAnimCmd sSpriteAffineAnim_PsychoCutOpponent[] =
 const union AffineAnimCmd* const gSpriteAffineAnimTable_PsychoCutOpponent[] =
 {
 	sSpriteAffineAnim_PsychoCutOpponent,
+};
+
+static const union AffineAnimCmd sSpriteAffineAnim_WakeUpSlap[] =
+{
+	AFFINEANIMCMD_FRAME(0, 0, 64, 1), //Rotate left 90 degrees
+	AFFINEANIMCMD_FRAME(0, -32, 0, 7), //Flatten horizontally (on its side)
+	AFFINEANIMCMD_FRAME(0, 0, 0, 8), //Do Nothing
+	AFFINEANIMCMD_FRAME(0, -288, 0, 1), //Unflatten in other direction
+	AFFINEANIMCMD_FRAME(0, 32, 0, 7), //Flatten horizontally (on its side)
+	AFFINEANIMCMD_FRAME(0, 0, 0, 8), //Do Nothing
+	AFFINEANIMCMD_FRAME(0, 288, 0, 1), //Unflatten in other direction
+	AFFINEANIMCMD_JUMP(1),
+};
+
+const union AffineAnimCmd* const gSpriteAffineAnimTable_WakeUpSlap[] =
+{
+	sSpriteAffineAnim_WakeUpSlap,
+};
+
+static const union AffineAnimCmd sSpriteAffineAnim_WingAttackFeather[] =
+{
+	AFFINEANIMCMD_FRAME(0, 0, -1, 14), //Rotate a little right
+	AFFINEANIMCMD_FRAME(0, 0, 1, 28), //Rotate a little left
+	AFFINEANIMCMD_END,
+};
+
+const union AffineAnimCmd* const gSpriteAffineAnimTable_WingAttackFeather[] =
+{
+	sSpriteAffineAnim_WingAttackFeather,
 };
 
 static const union AffineAnimCmd sSpriteAffineAnim_FlutterbyPulsate[] =
@@ -746,11 +895,11 @@ void LoadShinyStarsSpriteTiles(void)
 
 void TryStartShinyAnimation(u8 battler, unusedArg struct Pokemon* mon)
 {
-    u8 taskId1, taskId2;
-    gBattleSpritesDataPtr->healthBoxesData[battler].flag_x80 = 1;
+	u8 taskId1, taskId2;
+	gBattleSpritesDataPtr->healthBoxesData[battler].flag_x80 = 1;
 
-    if (IsBattlerSpriteVisible(battler) && IsMonShiny(GetIllusionPartyData(battler)))
-    {
+	if (IsBattlerSpriteVisible(battler) && IsMonShiny(GetIllusionPartyData(battler)))
+	{
 		LoadShinyStarsSpriteTiles();
 		taskId1 = CreateTask((void*) (0x80F181C | 1), 10);
 		taskId2 = CreateTask((void*) (0x80F181C | 1), 10);
@@ -759,9 +908,9 @@ void TryStartShinyAnimation(u8 battler, unusedArg struct Pokemon* mon)
 		gTasks[taskId1].data[1] = 0;
 		gTasks[taskId2].data[1] = 1;
 		return;
-    }
+	}
 
-    gBattleSpritesDataPtr->healthBoxesData[battler].field_1_x1 = 1;
+	gBattleSpritesDataPtr->healthBoxesData[battler].field_1_x1 = 1;
 }
 
 void AnimTask_TechnoBlast(u8 taskId)
@@ -787,7 +936,7 @@ void AnimTask_GetTimeOfDay(u8 taskId)
 void AnimTask_GetLycanrocForm(u8 taskId)
 {
 	#ifdef SPECIES_LYCANROC_N
-	if (GetBankPartyData(gBattleAnimAttacker)->species == SPECIES_LYCANROC_N)
+	if (GetIllusionPartyData(gBattleAnimAttacker)->species == SPECIES_LYCANROC_N)
 		gBattleAnimArgs[0] = 1;
 	else
 	#endif
@@ -1023,7 +1172,7 @@ void AnimTask_ReloadAttackerSprite(u8 taskId)
 
 void AnimTask_PlayAttackerCry(u8 taskId)
 {
-	PlayCry3(GetBankPartyData(gBattleAnimAttacker)->species, 0, 1);
+	PlayCry3(GetIllusionPartyData(gBattleAnimAttacker)->species, 0, 1);
 	DestroyAnimVisualTask(taskId);
 }
 
@@ -1294,6 +1443,15 @@ static void InitSpritePosToGivenTarget(struct Sprite* sprite, u8 target)
 {
 	sprite->pos1.x = GetBattlerSpriteCoord2(target, BATTLER_COORD_X);
 	sprite->pos1.y = GetBattlerSpriteCoord2(target, BATTLER_COORD_Y);
+
+	SetAnimSpriteInitialXOffset(sprite, gBattleAnimArgs[0]);
+	sprite->pos2.y = gBattleAnimArgs[1];
+}
+
+static void InitSpritePosToGivenTargetRespectPicOffsets(struct Sprite* sprite, u8 target)
+{
+	sprite->pos1.x = GetBattlerSpriteCoord2(target, BATTLER_COORD_X_2);
+	sprite->pos1.y = GetBattlerSpriteCoord2(target, BATTLER_COORD_Y_PIC_OFFSET);
 
 	SetAnimSpriteInitialXOffset(sprite, gBattleAnimArgs[0]);
 	sprite->pos2.y = gBattleAnimArgs[1];
@@ -1845,7 +2003,7 @@ const struct OamData sTransparentFistOAM =
 
 static const union AffineAnimCmd sSpriteAffineAnim_ScaledApple[] =
 {
-	AFFINEANIMCMD_FRAME(64, 64, 0, 10), //Quadruple in size
+	AFFINEANIMCMD_FRAME(32, 32, 0, 10), //Double in size
 	AFFINEANIMCMD_END
 };
 
@@ -2176,11 +2334,32 @@ void SpriteCB_SpriteOnMonForDuration(struct Sprite *sprite)
 		DestroyAnimSprite(sprite);
 	else
 	{
-		sprite->pos1.x = GetBattlerSpriteCoord(target, 0);
-		sprite->pos1.y = GetBattlerSpriteCoord(target, 1);
+		sprite->pos1.x = GetBattlerSpriteCoord(target, BATTLER_COORD_X);
+		sprite->pos1.y = GetBattlerSpriteCoord(target, BATTLER_COORD_Y);
 
 		sprite->pos1.x += gBattleAnimArgs[1];
 		sprite->pos1.y += gBattleAnimArgs[2];
+		sprite->data[0] = 0;
+		sprite->data[1] = gBattleAnimArgs[3];
+		sprite->data[2] = gBattleAnimArgs[4];
+		sprite->data[3] = 0;
+		sprite->callback = (void*) (0x80B0EF0 | 1);
+	}
+}
+
+void SpriteCB_SpriteOnMonForDurationUseY(struct Sprite *sprite)
+{
+	u8 target = LoadBattleAnimTarget(0);
+
+	if (!IsBattlerSpriteVisible(target))
+		DestroyAnimSprite(sprite);
+	else
+	{
+		sprite->pos1.x = GetBattlerSpriteCoord(target, BATTLER_COORD_X);
+		sprite->pos1.y = GetBattlerSpriteCoord(target, BATTLER_COORD_Y_PIC_OFFSET);
+
+		sprite->pos2.x = gBattleAnimArgs[1];
+		sprite->pos2.y = gBattleAnimArgs[2];
 		sprite->data[0] = 0;
 		sprite->data[1] = gBattleAnimArgs[3];
 		sprite->data[2] = gBattleAnimArgs[4];
@@ -2323,6 +2502,65 @@ void SpriteCB_ForcePalm(struct Sprite* sprite)
 	sprite->callback = SpriteCB_ForcePalmStep1;
 }
 
+void SpriteCB_WakeUpSlapStep1(struct Sprite *sprite)
+{
+	sprite->pos2.x += sprite->data[1];
+
+	if (sprite->pos2.x >= sprite->data[0])
+		DestroyAnimSprite(sprite);
+}
+
+void SpriteCB_WakeUpSlapStep0(struct Sprite *sprite)
+{
+	sprite->pos2.x -= sprite->data[1];
+
+	if (sprite->pos2.x <= sprite->data[0])
+	{
+		sprite->data[0] = -sprite->data[0];
+		sprite->callback = SpriteCB_WakeUpSlapStep1;
+	}
+}
+
+//Creates a sprite that moves right then then along the target.
+//arg 0: Swipe distance
+//arg 1: Speed
+void SpriteCB_WakeUpSlap(struct Sprite *sprite)
+{
+	switch (sprite->data[7]) { //State
+		case 0:
+			sprite->pos2.x = gBattleAnimArgs[0];
+			sprite->data[0] = -gBattleAnimArgs[0]; //Swipe distance
+			sprite->data[1] = gBattleAnimArgs[1]; //Swipe speed
+			++sprite->data[7];
+			break;
+		//Right
+		case 1:
+		case 3:
+			sprite->pos2.x += sprite->data[1];
+
+			if (sprite->pos2.x >= sprite->data[0])
+			{
+				sprite->data[0] = -sprite->data[0];
+				++sprite->data[7];
+			}
+			break;
+		//Left
+		case 2:
+		case 4:
+			sprite->pos2.x -= sprite->data[1];
+
+			if (sprite->pos2.x <= sprite->data[0])
+			{
+				sprite->data[0] = -sprite->data[0];
+				++sprite->data[7];
+			}
+			break;
+		case 5:
+			DestroyAnimSprite(sprite);
+			break;
+	}
+}
+
 //Destroys the chains for Fairy Lock
 void SpriteCB_FairyLockChain(struct Sprite *sprite)
 {
@@ -2381,7 +2619,8 @@ void SpriteCB_HorizontalSliceStep(struct Sprite *sprite)
 //arg 4: direction
 void SpriteCB_HorizontalSlice(struct Sprite *sprite)
 {
-	InitSpritePosToAnimTarget(sprite, TRUE);
+	sprite->pos2.x = gBattleAnimArgs[0];
+	sprite->pos2.y = gBattleAnimArgs[1];
 
 	sprite->data[0] = gBattleAnimArgs[2]; //Slice distance
 	sprite->data[1] = gBattleAnimArgs[3]; //Slice speed
@@ -2462,7 +2701,7 @@ void AnimTask_TargetedLightning(u8 taskId)
 //Creates the mini Leech Life Needle
 void SpriteCB_LeechLifeNeedle(struct Sprite *sprite)
 {
-	if (GetBattlerSide(gBattleAnimTarget) == B_SIDE_PLAYER)
+	if (SIDE(gBattleAnimTarget) == B_SIDE_PLAYER)
 	{
 		gBattleAnimArgs[1] = -gBattleAnimArgs[1];
 		gBattleAnimArgs[0] = -gBattleAnimArgs[0];
@@ -2480,14 +2719,143 @@ void SpriteCB_LeechLifeNeedle(struct Sprite *sprite)
 	StoreSpriteCallbackInData6(sprite, DestroyAnimSprite);
 }
 
+//Targeted fire in Doubles for Incinerate
+
+//Launches a projectile from the attacker to the target's centre.
+//arg 0: initial x pixel offset
+//arg 1: initial y pixel offset
+//arg 2: target x pixel offset
+//arg 3: target y pixel offset
+//arg 4: duration
+//arg 5: wave amplitude
+//arg 6: target
+void SpriteCB_IncinerateBall(struct Sprite* sprite)
+{
+	InitSpritePosToAnimAttacker(sprite, 1);
+
+	if (SIDE(gBattleAnimAttacker) == B_SIDE_OPPONENT)
+		gBattleAnimArgs[2] = -gBattleAnimArgs[2];
+
+	if (IS_DOUBLE_BATTLE)
+	{
+		sprite->data[2] = (GetBattlerSpriteCoord2(gBattleAnimTarget, BATTLER_COORD_X_2)
+					   +  GetBattlerSpriteCoord2(PARTNER(gBattleAnimTarget), BATTLER_COORD_X_2)) / 2;
+		sprite->data[4] = (GetBattlerSpriteCoord2(gBattleAnimTarget, BATTLER_COORD_Y)
+					   +  GetBattlerSpriteCoord2(PARTNER(gBattleAnimTarget), BATTLER_COORD_Y_PIC_OFFSET)) / 2;
+	}
+	else
+	{
+		sprite->data[2] = GetBattlerSpriteCoord(gBattleAnimTarget, BATTLER_COORD_X_2) + gBattleAnimArgs[2];
+		sprite->data[4] = GetBattlerSpriteCoord(gBattleAnimTarget, BATTLER_COORD_Y_PIC_OFFSET) + gBattleAnimArgs[3];
+	}
+
+	sprite->data[0] = gBattleAnimArgs[4];
+	sprite->data[5] = gBattleAnimArgs[5];
+	InitAnimArcTranslation(sprite);
+
+	sprite->callback = SpriteCB_AnimMissileArcStep;
+	sprite->invisible = TRUE;
+}
+
+//Creates fire that moves diagonally down the opponent
+//arg 0: initial x pixel offset
+//arg 1: initial y pixel offset
+//arg 2: target x pixel offset
+//arg 3: target y pixel offset
+//arg 4: duration
+//arg 5: bank
+//arg 6: respect pic coords
+void SpriteCB_IncinerateFlare(struct Sprite *sprite)
+{
+    bool8 respectPicCoords;
+    u8 coordType;
+	u8 target = LoadBattleAnimTarget(5);
+
+	if (!IsBattlerSpriteVisible(target))
+		DestroyAnimSprite(sprite);
+	else
+	{
+		if (SIDE(gBattleAnimAttacker) == SIDE(gBattleAnimTarget)
+		&& (gBattleAnimAttacker == GetBattlerAtPosition(B_POSITION_PLAYER_RIGHT)
+		 || gBattleAnimAttacker == GetBattlerAtPosition(B_POSITION_OPPONENT_RIGHT)))
+		{
+			gBattleAnimArgs[2] = -gBattleAnimArgs[2];
+		}
+
+		if (!gBattleAnimArgs[6])
+		{
+			respectPicCoords = TRUE;
+			coordType = BATTLER_COORD_Y_PIC_OFFSET;
+		}
+		else
+		{
+			respectPicCoords = FALSE;
+			coordType = BATTLER_COORD_Y;
+		}
+		
+		if (respectPicCoords)
+			InitSpritePosToGivenTargetRespectPicOffsets(sprite, target);
+		else
+			InitSpritePosToGivenTarget(sprite, target);
+
+		if (SIDE(gBattleAnimAttacker) == B_SIDE_OPPONENT)
+			gBattleAnimArgs[2] = -gBattleAnimArgs[2];
+
+		sprite->data[0] = gBattleAnimArgs[4];
+		sprite->data[2] = GetBattlerSpriteCoord(target, BATTLER_COORD_X_2) + gBattleAnimArgs[2];
+		sprite->data[4] = GetBattlerSpriteCoord(target, coordType) + gBattleAnimArgs[3];
+		sprite->callback = StartAnimLinearTranslation;
+		StoreSpriteCallbackInData6(sprite, DestroyAnimSprite);
+	}
+}
+
+//Same as burn chance anim but can be used on multiple targets
+void SpriteCB_TargetedFireSpread(struct Sprite *sprite)
+{
+	u8 target = LoadBattleAnimTarget(5);
+	
+	if (!IsBattlerSpriteVisible(target))
+		DestroyAnimSprite(sprite);
+	else
+	{
+		InitSpritePosToGivenTarget(sprite, target);
+
+		sprite->pos2.y = 0; //Reset from being set in above command
+		sprite->pos1.y += gBattleAnimArgs[1];
+		sprite->data[0] = gBattleAnimArgs[4];
+		sprite->data[1] = gBattleAnimArgs[2];
+		sprite->data[2] = gBattleAnimArgs[3];
+
+		sprite->callback = TranslateSpriteLinearFixedPoint;
+		StoreSpriteCallbackInData6(sprite, DestroyAnimSprite);
+	}
+}
+
+//Launches the Dreepy Missile
+//arg 0: Target X-Pos
+//arg 1: Target Y-Pos
+//arg 2: Duration
+void SpriteCB_DragonDart(struct Sprite* sprite)
+{
+	InitSpritePosToAnimAttacker(sprite, TRUE);
+	if (SIDE(gBattleAnimTarget) == B_SIDE_OPPONENT)
+		StartSpriteAnim(sprite, 1);
+
+	sprite->data[0] = gBattleAnimArgs[2]; //Speed delay
+	sprite->data[2] = GetBattlerSpriteCoord(gBattleAnimTarget, BATTLER_COORD_X_2) + gBattleAnimArgs[0];
+	sprite->data[4] = GetBattlerSpriteCoord(gBattleAnimTarget, BATTLER_COORD_Y_PIC_OFFSET) + gBattleAnimArgs[1];
+	sprite->callback = StartAnimLinearTranslation;
+	StoreSpriteCallbackInData6(sprite, DestroyAnimSprite);
+}
+
 //Creates The Extreme Evoboost Circles
 void SpriteCB_ExtremeEvoboostCircle(struct Sprite *sprite)
 {
-    InitSpritePosToAnimAttacker(sprite, FALSE);
-    sprite->pos1.y += 20;
-    sprite->data[1] = 191;
-    sprite->callback = (void*) (0x80B190C | 1);
-    sprite->callback(sprite);
+	InitSpritePosToAnimAttacker(sprite, FALSE);
+	sprite->pos1.y += 20;
+	sprite->data[1] = 191;
+	sprite->callback = (void*) (0x80B190C | 1);
+	sprite->callback(sprite);
 }
 
 //Creates a twinkle in the upper corner of the screen
@@ -2619,15 +2987,17 @@ const struct OamData sGeyserOam =
 //Launches the fireball for Max Flare
 //arg 0: X pixel offset
 //arg 1: Y pixel offset
+//arg 2: Duration
+//arg 3: Wave Amplitude
 void SpriteCB_MaxFlareBall(struct Sprite* sprite)
 {
 	InitSpritePosToAnimAttacker(sprite, TRUE);
 	StartSpriteAffineAnim(sprite, 1);
 
-	sprite->data[0] = 50;
+	sprite->data[0] = gBattleAnimArgs[2];
 	sprite->data[2] = GetBattlerSpriteCoord(gBattleAnimTarget, BATTLER_COORD_X_2); //Target X
 	sprite->data[4] = GetBattlerSpriteCoord(gBattleAnimTarget, BATTLER_COORD_Y_PIC_OFFSET); //Target Y
-	sprite->data[5] = 5;
+	sprite->data[5] = gBattleAnimArgs[3];
 
 	InitAnimArcTranslation(sprite);
 	sprite->callback = SpriteCB_MaxFlareBallStep;
@@ -2909,7 +3279,157 @@ void SpriteCB_RolloutExplosion(struct Sprite *sprite)
 	}
 }
 
+//Creates vines to whip the target for G-Max Vine Lash
+//arg 0: initial x pixel offset
+//arg 1: initial y pixel offset
+//arg 2: flip horizontal
+void SpriteCB_VineLashWhip(struct Sprite* sprite)
+{
+	if (SIDE(gBattleAnimTarget) == B_SIDE_PLAYER)
+		gBattleAnimArgs[0] *= -1;
+
+	StartSpriteAffineAnim(sprite, gBattleAnimArgs[2]);
+	InitSpritePosToAnimTarget(sprite, TRUE);
+	StoreSpriteCallbackInData6(sprite, DestroySpriteAndMatrix);
+	sprite->callback = RunStoredCallbackWhenAnimEnds;
+}
+
+static void SpriteCB_CustomArc_Step(struct Sprite *sprite)
+{
+	sprite->invisible = FALSE;
+
+	if (TranslateAnimHorizontalArc(sprite))
+		DestroyAnimSprite(sprite);
+}
+
+//Launches a projectile from the attacker's cannons to the target.
+//arg 0: initial x pixel offset
+//arg 1: initial y pixel offset
+//arg 2: target x pixel offset
+//arg 3: target y pixel offset
+//arg 4: duration
+//arg 5: wave amplitude
+void SpriteCB_CannonadeBall(struct Sprite* sprite)
+{
+	InitSpritePosToAnimAttacker(sprite, 0);
+
+	if (SIDE(gBattleAnimAttacker))
+		gBattleAnimArgs[2] = -gBattleAnimArgs[2];
+
+	sprite->data[0] = gBattleAnimArgs[4];
+	sprite->data[2] = GetBattlerSpriteCoord(gBattleAnimTarget, BATTLER_COORD_X_2) + gBattleAnimArgs[2]; //Target X
+	sprite->data[4] = GetBattlerSpriteCoord(gBattleAnimTarget, BATTLER_COORD_Y_PIC_OFFSET) + gBattleAnimArgs[3]; //Target Y
+	sprite->data[5] = gBattleAnimArgs[5];
+	InitAnimArcTranslation(sprite);
+
+	sprite->callback = SpriteCB_CustomArc_Step;
+}
+
 //Anim Tasks//
+static const union AffineAnimCmd sSpriteAffineAnim_HyperspaceFuryEnemySide[] =
+{
+	AFFINEANIMCMD_FRAME(0, 0, 32, 1), //Rotate 45 degrees left
+	AFFINEANIMCMD_END,
+};
+
+static const union AffineAnimCmd sSpriteAffineAnim_HyperspaceFuryPlayerSide[] =
+{
+	AFFINEANIMCMD_FRAME(0, 0, -32, 1), //Rotate 45 degrees right
+	AFFINEANIMCMD_END,
+};
+
+static const union AffineAnimCmd* const sSpriteAffineAnim_HyperspaceFuryMon[] =
+{
+	sSpriteAffineAnim_HyperspaceFuryEnemySide,
+	sSpriteAffineAnim_HyperspaceFuryPlayerSide,
+};
+
+//Creates a sideways sprite of the attacker behind the enemy's side
+void AnimTask_CreateHyperspaceFuryMon(u8 taskId)
+{
+	u8 spriteId, subpriority, isBackPic;
+	u16 species;
+	s16 x;
+	u32 personality, otId;
+	struct Pokemon* monAtk;
+
+	switch (gTasks[taskId].data[0]) {
+		case 0: //Set up sprite
+			monAtk = GetIllusionPartyData(gBattleAnimAttacker);
+			personality = GetMonData(monAtk, MON_DATA_PERSONALITY, NULL);
+			otId = GetMonData(monAtk, MON_DATA_OT_ID, NULL);
+			if (gBattleSpritesDataPtr->bankData[gBattleAnimAttacker].transformSpecies == SPECIES_NONE)
+				species = GetMonData(monAtk, MON_DATA_SPECIES, NULL);
+			else
+				species = gBattleSpritesDataPtr->bankData[gBattleAnimAttacker].transformSpecies;
+
+			if (SIDE(gBattleAnimAttacker) == B_SIDE_PLAYER)
+			{
+				
+				subpriority = gSprites[GetAnimBattlerSpriteId(ANIM_TARGET)].subpriority + 1;
+				isBackPic = 0;
+				x = 272;
+			}
+			else
+			{
+				subpriority = gSprites[GetAnimBattlerSpriteId(ANIM_TARGET)].subpriority - 1;
+				isBackPic = 1;
+				x = -32;
+			}
+
+			spriteId = CreateMonPicBattleAnim(species, isBackPic, 0, x, GetBattlerSpriteCoord(gBattleAnimTarget, BATTLER_COORD_Y), subpriority, personality, otId, gBattleAnimAttacker, 0);
+			gSprites[spriteId].oam.affineMode = ST_OAM_AFFINE_NORMAL;
+			gSprites[spriteId].affineAnims = sSpriteAffineAnim_HyperspaceFuryMon;
+			CalcCenterToCornerVec(&gSprites[spriteId], gSprites[spriteId].oam.shape, gSprites[spriteId].oam.size, gSprites[spriteId].oam.affineMode);
+			InitSpriteAffineAnim(&gSprites[spriteId]);
+			if (SIDE(gBattleAnimAttacker) == B_SIDE_OPPONENT)
+				StartSpriteAffineAnim(&gSprites[spriteId], 1);
+			PlayCry1(species, 0);
+			gTasks[taskId].data[1] = spriteId;
+			gTasks[taskId].data[0]++;
+			break;
+		case 1: //Hoopa pop in
+			spriteId = gTasks[taskId].data[1];
+			if (SIDE(gBattleAnimAttacker) == B_SIDE_PLAYER)
+			{
+				if (gSprites[spriteId].pos2.x > -30)
+					gSprites[spriteId].pos2.x -= 3;
+				else if (!IsCryPlaying())
+					gTasks[taskId].data[0]++;
+			}
+			else
+			{
+				if (gSprites[spriteId].pos2.x < 30)
+					gSprites[spriteId].pos2.x += 3;
+				else if (!IsCryPlaying())
+					gTasks[taskId].data[0]++;
+			}
+			break;
+		case 2: //Hoopa pop out
+			spriteId = gTasks[taskId].data[1];
+			if (SIDE(gBattleAnimAttacker) == B_SIDE_PLAYER)
+			{
+				if (gSprites[spriteId].pos2.x < 0)
+					gSprites[spriteId].pos2.x += 4;
+				else
+					gTasks[taskId].data[0]++;
+			}
+			else
+			{
+				if (gSprites[spriteId].pos2.x > 0)
+					gSprites[spriteId].pos2.x -= 4;
+				else
+					gTasks[taskId].data[0]++;
+			}
+			break;
+		case 3: //Destroy sprite
+			spriteId = gTasks[taskId].data[1];
+			DestroySpriteAndFreeResources(&gSprites[spriteId]);
+			DestroyAnimVisualTask(taskId);
+			break;
+	}
+}
+
 extern const struct SpriteTemplate gRolloutExplosionSpriteTemplate;
 static void CreateRolloutExplosionSprite(struct Task* task)
 {
@@ -3441,51 +3961,64 @@ void AnimTask_AllBanksInvisibleExceptAttackerAndTarget(u8 taskId)
 	DestroyAnimVisualTask(taskId);
 }
 
-#define RESTORE_HIDDEN_HEALTHBOXES									\
-{																	\
-	for (sprite = 0; sprite < MAX_SPRITES; ++sprite)				\
-		{															\
-			switch (gSprites[sprite].template->tileTag) {			\
-				case TAG_HEALTHBOX_PLAYER1_TILE:					\
-				case TAG_HEALTHBOX_PLAYER2_TILE:					\
-				case TAG_HEALTHBOX_OPPONENT1_TILE:					\
-				case TAG_HEALTHBOX_OPPONENT2_TILE:					\
-				case TAG_HEALTHBAR_PLAYER1_TILE:					\
-				case TAG_HEALTHBAR_OPPONENT1_TILE:					\
-				case TAG_HEALTHBAR_PLAYER2_TILE:					\
-				case TAG_HEALTHBAR_OPPONENT2_TILE:					\
-					switch (priority) {								\
-						case 0:										\
-							if (!gSprites[sprite].invisible)		\
-							{										\
-								gSprites[sprite].data[7] = TRUE;	\
-								gSprites[sprite].invisible = TRUE;	\
-							}										\
-							else									\
-							{										\
-								gSprites[sprite].data[7] = FALSE;	\
-							}										\
-							break;									\
-						default:									\
-							if (gSprites[sprite].data[7])			\
-							{										\
-								if (IsRaidBattle()					\
-								&& GetBankPartyData(BANK_RAID_BOSS)->hp == 0 \
-								&& (gSprites[sprite].template->tileTag == TAG_HEALTHBOX_OPPONENT1_TILE || gSprites[sprite].template->tileTag == TAG_HEALTHBAR_OPPONENT1_TILE)) \
-									continue;						\
-																	\
-								gSprites[sprite].invisible = FALSE;	\
-								gSprites[sprite].data[7] = FALSE;	\
-							}										\
-					}												\
-			}														\
-		}															\
+#define RESTORE_HIDDEN_HEALTHBOXES												\
+{																				\
+	for (spriteId = 0; spriteId < MAX_SPRITES; ++spriteId)						\
+	{																			\
+		switch (gSprites[spriteId].template->tileTag) {							\
+			case TAG_HEALTHBOX_PLAYER1_TILE:									\
+			case TAG_HEALTHBOX_PLAYER2_TILE:									\
+			case TAG_HEALTHBOX_OPPONENT1_TILE:									\
+			case TAG_HEALTHBOX_OPPONENT2_TILE:									\
+			case TAG_HEALTHBAR_PLAYER1_TILE:									\
+			case TAG_HEALTHBAR_OPPONENT1_TILE:									\
+			case TAG_HEALTHBAR_PLAYER2_TILE:									\
+			case TAG_HEALTHBAR_OPPONENT2_TILE:									\
+				switch (priority) {												\
+					case 0:														\
+						ChangeHealthboxVisibility(spriteId, TRUE);				\
+						break;													\
+					default:													\
+						if (IsRaidBattle()										\
+						&& GetBankPartyData(BANK_RAID_BOSS)->hp == 0			\
+						&& (gSprites[spriteId].template->tileTag == TAG_HEALTHBOX_OPPONENT1_TILE || gSprites[spriteId].template->tileTag == TAG_HEALTHBAR_OPPONENT1_TILE)) \
+							continue;											\
+																				\
+						ChangeHealthboxVisibility(spriteId, FALSE);				\
+				}																\
+		}																		\
+	}																			\
+}
+
+static void ChangeHealthboxVisibility(u8 spriteId, bool8 hide)
+{
+	struct Sprite* sprite = &gSprites[spriteId];
+	
+	if (gNewBS == NULL) //Battle struct was already freed at end of battle
+		return;
+
+	if (hide)
+	{
+		if (!sprite->invisible) //Sprite isn't already hidden
+		{
+			sprite->invisible = TRUE;
+			gNewBS->hiddenHealthboxFlags[spriteId / 8] |= gBitTable[spriteId % 8]; //Set special hidden flag
+		}
+	}
+	else
+	{
+		if (sprite->invisible && gNewBS->hiddenHealthboxFlags[spriteId / 8] & gBitTable[spriteId % 8]) //Sprite was hidden during animation
+		{
+			sprite->invisible = FALSE;
+			gNewBS->hiddenHealthboxFlags[spriteId / 8] &= ~gBitTable[spriteId % 8]; //Remove special hidden flag
+		}
+	}
 }
 
 #define hMain_HealthBarSpriteId	 data[5]
 void UpdateOamPriorityInAllHealthboxes(u8 priority)
 {
-	u32 i, sprite;
+	u32 i, spriteId;
 
 	#ifndef HIDE_HEALTHBOXES_DURING_ANIMS
 		goto DEFAULT_CASE;
@@ -3496,7 +4029,7 @@ void UpdateOamPriorityInAllHealthboxes(u8 priority)
 			if (sAnimMoveIndex == MOVE_TRANSFORM)
 				goto DEFAULT_CASE;
 			#ifdef DONT_HIDE_HEALTHBOXES_ATTACKER_STATUS_MOVES
-			if (gBattleMoves[move].target & MOVE_TARGET_USER)
+			if (gBattleMoves[sAnimMoveIndex].target & MOVE_TARGET_USER)
 				goto DEFAULT_CASE;
 			#endif
 			goto HIDE_BOXES;
@@ -3513,8 +4046,8 @@ void UpdateOamPriorityInAllHealthboxes(u8 priority)
 				case B_ANIM_FUTURE_SIGHT_HIT:
 				case B_ANIM_DOOM_DESIRE_HIT:
 				case B_ANIM_WISH_HEAL:
-				case B_ANIM_ASTONISH_DROPS:
-				case B_ANIM_SCARY_FACE_ASTONISH:
+				case B_ANIM_MON_SCARED:
+				case B_ANIM_GHOST_GET_OUT:
 				case B_ANIM_WISHIWASHI_FISH:
 				case B_ANIM_ZYGARDE_CELL_SWIRL:
 				case B_ANIM_ELECTRIC_SURGE:
@@ -3550,7 +4083,7 @@ void UpdateOamPriorityInAllHealthboxes(u8 priority)
 				gSprites[healthboxRightSpriteId].oam.priority = priority;
 				gSprites[healthbarSpriteId].oam.priority = priority;
 
-				if (priority) //Restore Hidden Healthboxes
+				if (priority > 0) //Restore Hidden Healthboxes
 				{
 					RESTORE_HIDDEN_HEALTHBOXES;
 				}
@@ -3576,6 +4109,145 @@ u8 CalcHealthBarPixelChange(unusedArg u8 bank)
 	#else
 		return 1;
 	#endif
+}
+
+//The original function would run through gBattlerSpriteIds until it found a spriteId
+//that matched. This would cause issues if there was a Pokemon missing from the field who
+//used to have the same spriteId as the current sprite in the animation.
+u16 GetBattlerYDeltaFromSpriteId(u8 spriteId)
+{
+	u16 species;
+    struct BattleSpriteInfo* spriteInfo;
+	struct Pokemon* mon;
+    u8 bank = gSprites[spriteId].data[0];
+
+	mon = GetIllusionPartyData(bank);
+	spriteInfo = gBattleSpritesDataPtr->bankData;
+	if (!spriteInfo[bank].transformSpecies)
+		species = GetMonData(mon, MON_DATA_SPECIES, NULL);
+	else
+		species = spriteInfo[bank].transformSpecies;
+
+	if (SIDE(bank) == B_SIDE_PLAYER)
+		return gMonBackPicCoords[species].y_offset;
+	else
+		return gMonFrontPicCoords[species].y_offset;
+
+    return MAX_SPRITES;
+}
+
+void HandleSpeciesGfxDataChange(u8 bankAtk, u8 bankDef, u8 transformType)
+{
+	u8 position;
+	u16 targetSpecies, paletteOffset;
+	u32 personality, otId;
+	const u32 *lzPaletteData;
+
+    if (transformType == 0xFF) //Silph Scope
+    {
+		const void* src;
+		void* dst;
+
+		struct Pokemon* monAtk;
+        position = GetBattlerPosition(bankAtk);
+		monAtk = GetBankPartyData(bankAtk);
+        targetSpecies = GetMonData(monAtk, MON_DATA_SPECIES, NULL);
+        personality = GetMonData(monAtk, MON_DATA_PERSONALITY, NULL);
+        otId = GetMonData(monAtk, MON_DATA_OT_ID, NULL);
+
+        HandleLoadSpecialPokePic_DontHandleDeoxys(&gMonFrontPicTable[targetSpecies], gMonSpritesGfxPtr->sprites[position], targetSpecies, personality);
+        src = gMonSpritesGfxPtr->sprites[position];
+        dst = (void *)(VRAM + 0x10000 + gSprites[gBattlerSpriteIds[bankAtk]].oam.tileNum * 32);
+        DmaCopy32(3, src, dst, 0x800);
+        paletteOffset = 0x100 + bankAtk * 16;
+        lzPaletteData = GetMonSpritePalFromSpeciesAndPersonality(targetSpecies, otId, personality);
+		LZDecompressWram(lzPaletteData, gDecompressionBuffer);
+		LoadPalette(gDecompressionBuffer, paletteOffset, 32);
+        TryFadeBankPaletteForDynamax(bankAtk, paletteOffset);
+		gSprites[gBattlerSpriteIds[bankAtk]].pos1.y = GetBattlerSpriteDefault_Y(bankAtk);
+        StartSpriteAnim(&gSprites[gBattlerSpriteIds[bankAtk]], gBattleMonForms[bankAtk]);
+        SetMonData(monAtk, MON_DATA_NICKNAME, gSpeciesNames[targetSpecies]);
+        UpdateNickInHealthbox(gHealthboxSpriteIds[bankAtk], monAtk);
+        TryAddPokeballIconToHealthbox(gHealthboxSpriteIds[bankAtk], 1);
+    }
+	else if (transformType == 0xFE) //Transforming animation for form change
+	{
+		const void* src;
+		void* dst;
+		struct Pokemon* monAtk;
+		const struct CompressedSpriteSheet* spriteSheet;
+
+		position = GetBattlerPosition(bankAtk);
+		monAtk = GetBankPartyData(bankAtk);
+		targetSpecies = GetMonData(monAtk, MON_DATA_SPECIES, NULL);
+		otId = GetMonData(monAtk, MON_DATA_OT_ID, NULL);
+		personality = GetMonData(monAtk, MON_DATA_PERSONALITY, NULL);
+
+		if (SIDE(bankAtk) == B_SIDE_PLAYER)
+			spriteSheet = &gMonBackPicTable[targetSpecies];
+		else
+			spriteSheet = &gMonFrontPicTable[targetSpecies];
+
+		HandleLoadSpecialPokePic_DontHandleDeoxys(spriteSheet, gMonSpritesGfxPtr->sprites[position], targetSpecies, personality);
+		src = gMonSpritesGfxPtr->sprites[position];
+		dst = (void *)(VRAM + 0x10000 + gSprites[gBattlerSpriteIds[bankAtk]].oam.tileNum * 32);
+		DmaCopy32(3, src, dst, 0x800);
+		paletteOffset = 0x100 + bankAtk * 16;
+		lzPaletteData = GetMonSpritePalFromSpeciesAndPersonality(targetSpecies, otId, personality);
+		LZDecompressWram(lzPaletteData, gDecompressionBuffer);
+		LoadPalette(gDecompressionBuffer, paletteOffset, 32);
+		TryFadeBankPaletteForDynamax(bankAtk, paletteOffset);
+		gSprites[gBattlerSpriteIds[bankAtk]].pos1.y = GetBattlerSpriteDefault_Y(bankAtk);
+		StartSpriteAnim(&gSprites[gBattlerSpriteIds[bankAtk]], gBattleMonForms[bankAtk]);
+	}
+	else if (transformType != 0) //Castform
+	{
+		StartSpriteAnim(&gSprites[gBattlerSpriteIds[bankAtk]], gBattleSpritesDataPtr->animationData->animArg);
+		paletteOffset = 0x100 + bankAtk * 16;
+		LoadPalette(gBattleStruct->castformPalette[gBattleSpritesDataPtr->animationData->animArg], paletteOffset, 32);
+		gBattleMonForms[bankAtk] = gBattleSpritesDataPtr->animationData->animArg;
+		TryFadeBankPaletteForDynamax(bankAtk, paletteOffset);
+		gSprites[gBattlerSpriteIds[bankAtk]].pos1.y = GetBattlerSpriteDefault_Y(bankAtk);
+	}
+	else //Regular attack Transform
+	{
+		const void* src;
+		void* dst;
+		struct Pokemon* monDef;
+		const struct CompressedSpriteSheet* spriteSheet;
+
+		position = GetBattlerPosition(bankAtk);
+		monDef = GetBankPartyData(bankDef);
+		targetSpecies = GetMonData(monDef, MON_DATA_SPECIES, NULL);
+		targetSpecies = TryFixDynamaxTransformSpecies(bankAtk, targetSpecies);
+		otId = GetMonData(GetBankPartyData(bankAtk)/*monDef*/, MON_DATA_OT_ID, NULL); //Must use monAtk, otherwise will be shiny now, and not on screen reload
+
+		if (SIDE(bankAtk) == B_SIDE_PLAYER)
+			spriteSheet = &gMonBackPicTable[targetSpecies];
+		else
+			spriteSheet = &gMonFrontPicTable[targetSpecies];
+
+		HandleLoadSpecialPokePic_DontHandleDeoxys(spriteSheet, gMonSpritesGfxPtr->sprites[position], targetSpecies, gTransformedPersonalities[bankAtk]);
+		src = gMonSpritesGfxPtr->sprites[position];
+		dst = (void *)(VRAM + 0x10000 + gSprites[gBattlerSpriteIds[bankAtk]].oam.tileNum * 32);
+		DmaCopy32(3, src, dst, 0x800);
+		paletteOffset = 0x100 + bankAtk * 16;
+		lzPaletteData = GetMonSpritePalFromSpeciesAndPersonality(targetSpecies, otId, gTransformedPersonalities[bankAtk]);
+		LZDecompressWram(lzPaletteData, gDecompressionBuffer);
+		LoadPalette(gDecompressionBuffer, paletteOffset, 32);
+
+		if (targetSpecies == SPECIES_CASTFORM)
+		{
+			LZDecompressWram(lzPaletteData, gBattleStruct->castformPalette[0]);
+			LoadPalette(gBattleStruct->castformPalette[0] + gBattleMonForms[bankDef] * 16, paletteOffset, 32);
+		}
+
+		TryFadeBankPaletteForDynamax(bankAtk, paletteOffset);
+		gBattleSpritesDataPtr->bankData[bankAtk].transformSpecies = targetSpecies;
+		gBattleMonForms[bankAtk] = gBattleMonForms[bankDef];
+		gSprites[gBattlerSpriteIds[bankAtk]].pos1.y = GetBattlerSpriteDefault_Y(bankAtk);
+		StartSpriteAnim(&gSprites[gBattlerSpriteIds[bankAtk]], gBattleMonForms[bankAtk]);
+	}
 }
 
 #define tBattlerId 	data[0]
@@ -3685,7 +4357,6 @@ static bool8 ShouldAnimBeDoneRegardlessOfSubsitute(u8 animId)
 	switch (animId) {
 		case B_ANIM_SUBSTITUTE_FADE:
 		case B_ANIM_SNATCH_MOVE:
-		case B_ANIM_LOAD_DEFAULT_BG:
 		case B_ANIM_LOAD_ABILITY_POP_UP:
 		case B_ANIM_DESTROY_ABILITY_POP_UP:
 		case B_ANIM_RAIN_CONTINUES:
@@ -3694,6 +4365,16 @@ static bool8 ShouldAnimBeDoneRegardlessOfSubsitute(u8 animId)
 		case B_ANIM_HAIL_CONTINUES:
 		case B_ANIM_STRONG_WINDS_CONTINUE:
 		case B_ANIM_FOG_CONTINUES:
+		case B_ANIM_ELECTRIC_SURGE:
+		case B_ANIM_GRASSY_SURGE:
+		case B_ANIM_MISTY_SURGE:
+		case B_ANIM_PSYCHIC_SURGE:
+		case B_ELECTRIC_TERRAIN_ACTIVE_ANIM:
+		case B_GRASSY_TERRAIN_ACTIVE_ANIM:
+		case B_MISTY_TERRAIN_ACTIVE_ANIM:
+		case B_PSYCHIC_TERRAIN_ACTIVE_ANIM:
+		case B_ANIM_LOAD_DEFAULT_BG:
+		case B_ANIM_TOTEM_BOOST:
 		case B_ANIM_DYNAMAX_START:
 		case B_ANIM_RAID_BATTLE_STORM:
 		case B_ANIM_DYNAMAX_ENERGY_SWIRL:
@@ -3711,6 +4392,11 @@ static bool8 ShouldSubstituteRecedeForSpecialBattleAnim(u8 animId)
 		case B_ANIM_ZYGARDE_CELL_SWIRL:
 		case B_ANIM_BLUE_PRIMAL_REVERSION:
 		case B_ANIM_RED_PRIMAL_REVERSION:
+		case B_ANIM_POWDER_EXPLOSION:
+		case B_ANIM_BEAK_BLAST_WARM_UP:
+		case B_ANIM_SHELL_TRAP_SET:
+		case B_BATON_PASS_ANIM:
+		case B_DRAGON_TAIL_BLOW_AWAY_ANIM:
 		case B_ANIM_ZMOVE_ACTIVATE:
 		case B_ANIM_MEGA_EVOLUTION:
 		case B_ANIM_ULTRA_BURST:

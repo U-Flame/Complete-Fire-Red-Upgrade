@@ -100,6 +100,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_VENUSAUR,
@@ -146,7 +147,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.moves =
 		{
 			MOVE_FIREPUNCH,
-			MOVE_DRAGONCLAW,
+			MOVE_DUALWINGBEAT,
 			MOVE_SHADOWCLAW,
 			MOVE_BELLYDRUM,
 		},
@@ -154,6 +155,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_CHARIZARD,
@@ -310,6 +312,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_BLASTOISE,
@@ -362,6 +365,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_BUTTERFREE,
@@ -440,6 +444,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = FALSE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = FALSE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_BEEDRILL,
@@ -924,7 +929,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.item = ITEM_WACAN_BERRY,
 		.moves =
 		{
-			MOVE_PLUCK,
+			MOVE_DUALWINGBEAT,
 			MOVE_TOXIC,
 			MOVE_DEFOG,
 			MOVE_SCARYFACE,
@@ -1848,7 +1853,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.item = ITEM_CHARTI_BERRY,
 		.moves =
 		{
-			MOVE_INCINERATE,
+			MOVE_SCORCHINGSANDS,
 			MOVE_HEX,
 			MOVE_WILLOWISP,
 			MOVE_CONFUSERAY,
@@ -3442,6 +3447,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_MACHAMP,
@@ -3468,6 +3474,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = FALSE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = FALSE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_VICTREEBEL,
@@ -4741,6 +4748,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_GENGAR,
@@ -4977,6 +4985,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_KINGLER,
@@ -5030,6 +5039,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = FALSE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = FALSE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_ELECTRODE,
@@ -6828,6 +6838,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_LAPRAS,
@@ -6854,6 +6865,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_LAPRAS,
@@ -6880,6 +6892,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_LAPRAS,
@@ -7546,7 +7559,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.moves =
 		{
 			MOVE_STONEEDGE,
-			MOVE_AERIALACE,
+			MOVE_DUALWINGBEAT,
 			MOVE_EARTHQUAKE,
 			MOVE_CRUNCH,
 		},
@@ -7572,7 +7585,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.moves =
 		{
 			MOVE_STONEEDGE,
-			MOVE_AERIALACE,
+			MOVE_DUALWINGBEAT,
 			MOVE_EARTHQUAKE,
 			MOVE_DRAGONDANCE,
 		},
@@ -7597,7 +7610,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.item = ITEM_AERODACTYLITE,
 		.moves =
 		{
-			MOVE_AERIALACE,
+			MOVE_DUALWINGBEAT,
 			MOVE_IRONHEAD,
 			MOVE_FIREFANG,
 			MOVE_ICEFANG,
@@ -7684,6 +7697,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_SNORLAX,
@@ -7737,6 +7751,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = FALSE,
 		.specificTeamType = DOUBLES_TRICK_ROOM_TEAM,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_SNORLAX,
@@ -7764,6 +7779,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = FALSE,
 		.specificTeamType = DOUBLES_TRICK_ROOM_TEAM,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_ARTICUNO,
@@ -11324,7 +11340,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 			MOVE_UTURN,
 			MOVE_BULLETPUNCH,
 			MOVE_SUPERPOWER,
-			MOVE_KNOCKOFF,
+			MOVE_DUALWINGBEAT,
 		},
 		.ball = BALL_TYPE_RANDOM,
 		.forSingles = TRUE,
@@ -14687,7 +14703,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.moves =
 		{
 			MOVE_LEECHFANG,
-			MOVE_AERIALACE,
+			MOVE_DUALWINGBEAT,
 			MOVE_DIG,
 			MOVE_SWORDSDANCE,
 		},
@@ -14713,7 +14729,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.moves =
 		{
 			MOVE_XSCISSOR,
-			MOVE_AERIALACE,
+			MOVE_DUALWINGBEAT,
 			MOVE_FINALGAMBIT,
 			MOVE_UTURN,
 		},
@@ -30355,10 +30371,10 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.defEv = 4,
 		.spdEv = 252,
 		.ability = FRONTIER_ABILITY_1, //ABILITY_DEFEATIST
-		.item = ITEM_POWER_HERB,
+		.item = ITEM_CHOICE_BAND,
 		.moves =
 		{
-			MOVE_SKYATTACK,
+			MOVE_DUALWINGBEAT,
 			MOVE_STONEEDGE,
 			MOVE_DRAGONCLAW,
 			MOVE_UTURN,
@@ -30445,6 +30461,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = FALSE,
 		.modifyMovesDoubles = FALSE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_GARBODOR,
@@ -30497,6 +30514,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = FALSE,
 		.modifyMovesDoubles = FALSE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_GARBODOR,
@@ -30523,6 +30541,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.forSingles = FALSE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = FALSE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_ZOROARK,
@@ -33058,7 +33077,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		{
 			MOVE_DRAGONCLAW,
 			MOVE_NIGHTSLASH,
-			MOVE_SLASH,
+			MOVE_DUALWINGBEAT,
 			MOVE_HONECLAWS,
 		},
 		.ball = BALL_TYPE_RANDOM,
@@ -40675,7 +40694,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.item = ITEM_LEFTOVERS,
 		.moves =
 		{
-			MOVE_SHADOWBALL,
+			MOVE_SCORCHINGSANDS,
 			MOVE_TOXIC,
 			MOVE_STEALTHROCK,
 			MOVE_SHOREUP,
@@ -40701,7 +40720,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.moves =
 		{
 			MOVE_SHADOWBALL,
-			MOVE_EARTHPOWER,
+			MOVE_SCORCHINGSANDS,
 			MOVE_SANDSTORM,
 			MOVE_SHOREUP,
 		},
@@ -40752,7 +40771,7 @@ const struct BattleTowerSpread gFrontierSpreads[] =
 		.item = ITEM_SMOOTH_ROCK,
 		.moves =
 		{
-			MOVE_TOXIC,
+			MOVE_SCORCHINGSANDS,
 			MOVE_STEALTHROCK,
 			MOVE_SANDSTORM,
 			MOVE_SHOREUP,
@@ -47375,13 +47394,14 @@ const struct BattleTowerSpread gFrontierLegendarySpreads[] =
 		{
 			MOVE_DOUBLEIRONBASH,
 			MOVE_ICEPUNCH,
-			MOVE_SUPERPOWER,
+			MOVE_EARTHQUAKE,
 			MOVE_THUNDERPUNCH,
 		},
 		.ball = BALL_TYPE_RANDOM,
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_MELMETAL,
@@ -47400,7 +47420,7 @@ const struct BattleTowerSpread gFrontierLegendarySpreads[] =
 		.moves =
 		{
 			MOVE_DOUBLEIRONBASH,
-			MOVE_MEGAPUNCH,
+			MOVE_EARTHQUAKE,
 			MOVE_ICEPUNCH,
 			MOVE_ACIDARMOR,
 		},
@@ -47434,6 +47454,34 @@ const struct BattleTowerSpread gFrontierLegendarySpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
+	},
+	{
+		.species = SPECIES_MELMETAL,
+		.nature = NATURE_ADAMANT,
+		.hpIv = 31,
+		.atkIv = 31,
+		.defIv = 31,
+		.spAtkIv = 0,
+		.spDefIv = 31,
+		.spdIv = 31,
+		.hpEv = 252,
+		.atkEv = 252,
+		.spDefEv = 4,
+		.ability = FRONTIER_ABILITY_1, //ABILITY_IRONFIST
+		.item = ITEM_LEFTOVERS,
+		.moves =
+		{
+			MOVE_DOUBLEIRONBASH,
+			MOVE_HIGHHORSEPOWER,
+			MOVE_ICEPUNCH,
+			MOVE_PROTECT,
+		},
+		.ball = BALL_TYPE_RANDOM,
+		.forSingles = FALSE,
+		.forDoubles = TRUE,
+		.modifyMovesDoubles = FALSE,
+		.gigantamax = TRUE,
 	},
 };
 
@@ -47742,7 +47790,7 @@ const struct BattleTowerSpread gMiddleCupSpreads[] =
 		.moves =
 		{
 			MOVE_TAKEDOWN,
-			MOVE_BRAVEBIRD,
+			MOVE_DUALWINGBEAT,
 			MOVE_UTURN,
 			MOVE_ROOST,
 		},
@@ -47981,7 +48029,7 @@ const struct BattleTowerSpread gMiddleCupSpreads[] =
 		.item = ITEM_EVIOLITE,
 		.moves =
 		{
-			MOVE_BRAVEBIRD,
+			MOVE_DUALWINGBEAT,
 			MOVE_TOXIC,
 			MOVE_DEFOG,
 			MOVE_ROOST,
@@ -49893,24 +49941,24 @@ const struct BattleTowerSpread gMiddleCupSpreads[] =
 	},
 	{
 		.species = SPECIES_VIBRAVA,
-		.nature = NATURE_IMPISH,
+		.nature = NATURE_ADAMANT,
 		.hpIv = 31,
 		.atkIv = 31,
 		.defIv = 31,
 		.spAtkIv = 0,
 		.spDefIv = 31,
 		.spdIv = 31,
-		.hpEv = 248,
+		.atkEv = 252,
 		.defEv = 252,
-		.spDefEv = 8,
+		.spDefEv = 4,
 		.ability = FRONTIER_ABILITY_1, //ABILITY_LEVITATE
-		.item = ITEM_EVIOLITE,
+		.item = ITEM_WEAKNESS_POLICY,
 		.moves =
 		{
 			MOVE_EARTHQUAKE,
-			MOVE_UTURN,
-			MOVE_DEFOG,
-			MOVE_ROOST,
+			MOVE_THROATCHOP,
+			MOVE_DUALWINGBEAT,
+			MOVE_TAILWIND,
 		},
 		.ball = BALL_TYPE_RANDOM,
 		.forSingles = TRUE,
@@ -50688,7 +50736,7 @@ const struct BattleTowerSpread gMiddleCupSpreads[] =
 		.moves =
 		{
 			MOVE_RETURN,
-			MOVE_AIRCUTTER,
+			MOVE_DUALWINGBEAT,
 			MOVE_UTURN,
 			MOVE_HYPNOSIS,
 		},
@@ -50714,7 +50762,7 @@ const struct BattleTowerSpread gMiddleCupSpreads[] =
 		.moves =
 		{
 			MOVE_RETURN,
-			MOVE_AIRCUTTER,
+			MOVE_DUALWINGBEAT,
 			MOVE_NIGHTSLASH,
 			MOVE_HYPNOSIS,
 		},
@@ -51649,7 +51697,7 @@ const struct BattleTowerSpread gMiddleCupSpreads[] =
 		.item = ITEM_LIFE_ORB,
 		.moves =
 		{
-			MOVE_AERIALACE,
+			MOVE_DUALWINGBEAT,
 			MOVE_UTURN,
 			MOVE_SWORDSDANCE,
 			MOVE_ROOST,
@@ -52331,7 +52379,7 @@ const struct BattleTowerSpread gLittleCupSpreads[] =
 		.moves =
 		{
 			MOVE_ROCKSLIDE,
-			MOVE_ACROBATICS,
+			MOVE_DUALWINGBEAT,
 			MOVE_HEADSMASH,
 			MOVE_EARTHQUAKE,
 		},
@@ -53869,6 +53917,7 @@ const struct BattleTowerSpread gLittleCupSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = FALSE,
 		.modifyMovesDoubles = FALSE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_EKANS,
@@ -56590,7 +56639,7 @@ const struct BattleTowerSpread gLittleCupSpreads[] =
 		.item = ITEM_LIFE_ORB,
 		.moves =
 		{
-			MOVE_PLUCK,
+			MOVE_DUALWINGBEAT,
 			MOVE_NIGHTSLASH,
 			MOVE_UTURN,
 			MOVE_STEELWING,
@@ -59677,7 +59726,7 @@ const struct BattleTowerSpread gLittleCupSpreads[] =
 		.moves =
 		{
 			MOVE_BUGBITE,
-			MOVE_AERIALACE,
+			MOVE_DUALWINGBEAT,
 			MOVE_SWORDSDANCE,
 			MOVE_ROOST,
 		},
@@ -60475,6 +60524,7 @@ const struct BattleTowerSpread gPikachuSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_PIKACHU_COSPLAY,
@@ -60501,6 +60551,7 @@ const struct BattleTowerSpread gPikachuSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_PIKACHU_LIBRE,
@@ -60553,6 +60604,7 @@ const struct BattleTowerSpread gPikachuSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 	{
 		.species = SPECIES_PIKACHU_ROCK_STAR,
@@ -60631,6 +60683,7 @@ const struct BattleTowerSpread gPikachuSpreads[] =
 		.forSingles = TRUE,
 		.forDoubles = TRUE,
 		.modifyMovesDoubles = TRUE,
+		.gigantamax = TRUE,
 	},
 };
 

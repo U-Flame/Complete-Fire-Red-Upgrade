@@ -1663,12 +1663,8 @@ u32 GetDaysSinceTimeInValue(u32 value)
 	return GetDayDifference(startYear, startTime->month, startTime->day, gClock.year, gClock.month, gClock.day);
 }
 
-//@Details: Updates the time stored in a pair of vars.
-//@Input: Var 0x8000: A var containing the daily event data.
-//					  The var after this one is used as well.
-void sp0A1_UpdateTimeInVars(void)
+void UpdateTimeInVars(u16 eventVar)
 {
-	u16 eventVar = Var8000; //Var contained in Var8000
 	struct DailyEventVar* data = (struct DailyEventVar*) GetVarPointer(eventVar);
 
 	data->minute = gClock.minute;
@@ -1677,6 +1673,14 @@ void sp0A1_UpdateTimeInVars(void)
 	data->month = gClock.month;
 	data->year = gClock.year % 100;
 	data->century = gClock.year / 100;
+}
+
+//@Details: Updates the time stored in a pair of vars.
+//@Input: Var 0x8000: A var containing the daily event data.
+//					  The var after this one is used as well.
+void sp0A1_UpdateTimeInVars(void)
+{
+	UpdateTimeInVars(Var8000); //Var contained in Var8000
 }
 
 //@Details: Gets the time difference between the data stored in a var and the current time.
@@ -2556,7 +2560,7 @@ void (*const sNamingScreenTitlePrintingFuncs[])(void) =
 #define ITEM_ICON_X (10 + 16)
 #define ITEM_ICON_Y (8 + 16)
 #define sHeaderBoxWindowId (*((u8*) 0x2039A28)) //Steal coin box Id
-#ifdef ITEM_PICTURE_ACQUIRE
+#if (defined ITEM_PICTURE_ACQUIRE && defined ITEM_DESCRIPTION_ACQUIRE)
 static void ShowObtainedItemDescription(unusedArg u16 itemId)
 {
 	struct WindowTemplate template;
@@ -2645,12 +2649,15 @@ static void ShowItemSpriteOnFind(unusedArg u16 itemId, unusedArg u8* spriteId)
 			gSprites[iconSpriteId].oam.matrixNum = AllocOamMatrix();
 			gSprites[iconSpriteId].affineAnims = sSpriteAffineAnimTable_KeyItemTM;
 			StartSpriteAffineAnim(&gSprites[iconSpriteId], 0);
-			
+
+			#ifdef ITEM_DESCRIPTION_ACQUIRE
 			if (!GetSetItemObtained(itemId, FLAG_GET_OBTAINED))
 				ShowObtainedItemDescription(itemId);
+			#endif
 		}
 		else
 		{
+			#ifdef ITEM_DESCRIPTION_ACQUIRE
 			if (GetSetItemObtained(itemId, FLAG_GET_OBTAINED))
 			{
 				//Place the item in the bottom right hand corner of the textbox
@@ -2664,6 +2671,12 @@ static void ShowItemSpriteOnFind(unusedArg u16 itemId, unusedArg u8* spriteId)
 				y = ITEM_ICON_Y;
 				ShowObtainedItemDescription(itemId);
 			}
+			#else
+			//Place the item in the bottom right hand corner of the textbox
+			x = 197 + 16;
+			y = 124 + 16;
+			sHeaderBoxWindowId = 0xFF;
+			#endif
 		}
 
 		gSprites[iconSpriteId].pos2.x = x;
@@ -2691,7 +2704,7 @@ static void ClearItemSpriteAfterFind(unusedArg u8 spriteId)
 	#endif
 }
 
-void ShowItemSpriteOnFindObtain(void)
+void sp0E4_ShowItemSpriteOnFindObtain(void)
 {
 	ShowItemSpriteOnFind(Var8004, (u8*) &Var8006);
 }
@@ -2701,7 +2714,7 @@ void ShowItemSpriteOnFindHidden(void)
 	ShowItemSpriteOnFind(Var8005, (u8*) &Var8007);
 }
 
-void ClearItemSpriteAfterFindObtain(void)
+void sp0E5_ClearItemSpriteAfterFindObtain(void)
 {
 	ClearItemSpriteAfterFind(Var8006);
 }
@@ -2933,17 +2946,21 @@ bool8 TakeCoins(u32 toTake)
 // Check if player has a certain number of coins
 bool8 scrB3_CheckCoins(struct ScriptContext *ctx)
 {
+	#ifndef REPLACE_SOME_VANILLA_SPECIALS
+	u16 *ptr = GetVarPointer(ScriptReadHalfword(ctx));
+	*ptr = GetCoins();
+	#else
 	u32 amount, arg;
 
 	#ifndef UNBOUND
 		arg = ScriptReadHalfword(ctx);
 		#ifdef SAVE_BLOCK_EXPANSION
-			if (arg == 0xFFFF)
-				amount = (Var8000 << 16) + Var8001;
-			else
-				amount = VarGet(arg);
-		#else
+		if (arg == 0xFFFF)
+			amount = (Var8000 << 16) + Var8001;
+		else
 			amount = VarGet(arg);
+		#else
+		amount = VarGet(arg);
 		#endif
 	#else //Unbound
 		arg = ScriptReadWord(ctx);
@@ -2954,6 +2971,7 @@ bool8 scrB3_CheckCoins(struct ScriptContext *ctx)
 		gSpecialVar_LastResult = TRUE;
 	else
 		gSpecialVar_LastResult = FALSE;
+	#endif
 
 	return FALSE;
 }
@@ -2964,7 +2982,7 @@ bool8 scrB4_AddCoins(struct ScriptContext *ctx)
 {
 	u32 amount;
 	u16 arg = ScriptReadHalfword(ctx);
-	#ifdef SAVE_BLOCK_EXPANSION
+	#if (defined SAVE_BLOCK_EXPANSION && defined REPLACE_SOME_VANILLA_SPECIALS)
 		if (arg == 0xFFFF)
 			amount = (Var8000 << 16) + Var8001;
 		else
@@ -2986,7 +3004,7 @@ bool8 scrB5_SubtractCoins(struct ScriptContext *ctx)
 {
 	u32 amount;
 	u16 arg = ScriptReadHalfword(ctx);
-	#ifdef SAVE_BLOCK_EXPANSION
+	#if (defined SAVE_BLOCK_EXPANSION && defined REPLACE_SOME_VANILLA_SPECIALS)
 		if (arg == 0xFFFF)
 			amount = (Var8000 << 16) + Var8001;
 		else

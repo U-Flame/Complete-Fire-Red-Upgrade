@@ -8,6 +8,13 @@
 
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
+.global EventScript_SecondBagItemCanBeRegisteredToL
+EventScript_SecondBagItemCanBeRegisteredToL:
+	lockall
+	msgbox gText_SecondBagItemCanBeRegisteredToL MSG_SIGN
+	releaseall
+	end
+
 .global SystemScript_EnableAutoRun
 SystemScript_EnableAutoRun:
 	lockall
@@ -58,52 +65,59 @@ SystemScript_DisableBikeTurboBoost:
 
 .global SystemScript_PartyMenuFromField
 SystemScript_PartyMenuFromField:
-	lock
+	lockall
 	checksound
 	sound 0x5 @SE_SELECT
 	fadescreen FADEOUT_BLACK
 	callasm InitPartyMenuFromField
-	release
+	releaseall
 	end
 
 .global SystemScript_ItemMenuFromField
 SystemScript_ItemMenuFromField:
-	lock
+	lockall
 	checksound
 	sound 0x5 @SE_SELECT
 	fadescreen FADEOUT_BLACK
 	callasm InitBagMenuFromField
-	release
+	releaseall
 	end
 
 .global SystemScript_MiningScan
 SystemScript_MiningScan:
-	lock
+	lockall
 	checksound
 	sound 0xCA @SE_TWINKLE
-	callasm CreateMiningScanRing
+	getplayerpos 0x8000 0x8001
+	setfieldeffectarg 0, 0x8000
+	setfieldeffectarg 1, 0x8001
+	setfieldeffectarg 2, TRUE
+	dofieldeffect 48 @FLDEFF_THIN_RING
 	callasm IsBestMiningSpotOutOfView
 	compare LASTRESULT 0x0 @Out of view
 	if notequal _goto SystemScript_MiningScan_SkipFieldEffect
+	setfieldeffectarg 0, 0x8004
+	setfieldeffectarg 1, 0x8005
+	setfieldeffectarg 2, 0x8006
 	dofieldeffect 54 @FLDEFF_SPARKLE
 	waitfieldeffect 54 @FLDEFF_SPARKLE
-	release
+	releaseall
 	end
 
 SystemScript_MiningScan_SkipFieldEffect:
-	pause 50 @Wait for the ring to finish
-	release
+	waitfieldeffect 48 @FLDEFF_THIN_RING
+	releaseall
 	end
 
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 .global SystemScript_PoisonSurvial
 SystemScript_PoisonSurvial:
-	lock
+	lockall
 	msgboxsign
 	msgbox gText_PoisonSurvial MSG_KEEPOPEN
 	closeonkeypress
-	release
+	releaseall
 	end
 	
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -113,7 +127,7 @@ SystemScript_PoisonSurvial:
 .global EventScript_BwRepelWoreOff
 .global EventScript_RepelWoreOff
 EventScript_BwRepelWoreOff:
-	lock
+	lockall
 	checkitem 0x800E 1
 	compare LASTRESULT 1
 	if greaterorequal _goto AnotherRepel
@@ -156,15 +170,15 @@ FinishNewRepel:
 	goto EndScript
 	
 EventScript_RepelWoreOff:
-	lock
+	lockall
 	msgboxsign
 	msgbox gText_RepelWoreOff MSG_KEEPOPEN
 	closeonkeypress
 	
 EndScript:
-	release
+	releaseall
 	end
-	
+
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 .global SystemScript_StartDexNavBattle
@@ -202,12 +216,15 @@ SystemScript_WaitForFollower:
 
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
+.equ SPECIAL_SHOW_ITEM_SPRITE_ON_FIND_OBTAIN, 0xE4
+.equ SPECIAL_CLEAR_ITEM_SPRITE_AFTER_FIND_OBTAIN, 0xE5
+
 .global SystemScript_FindItemMessage
 SystemScript_FindItemMessage:
 	textcolor BLACK
 	hidesprite LASTTALKED
 	pause 0x1
-	callasm ShowItemSpriteOnFindObtain
+	special SPECIAL_SHOW_ITEM_SPRITE_ON_FIND_OBTAIN
 	additem 0x8004 0x8005
 	special2 LASTRESULT 0x196
 	copyvar 0x8008 LASTRESULT
@@ -218,7 +235,7 @@ SystemScript_FindItemMessage:
 	waitfanfare
 	waitmsg
 	msgbox 0x81A5218 MSG_KEEPOPEN 
-	callasm ClearItemSpriteAfterFindObtain
+	special SPECIAL_CLEAR_ITEM_SPRITE_AFTER_FIND_OBTAIN
 	return
 
 SystemScript_FindNormalItem:
@@ -248,7 +265,7 @@ SystemScript_ObtainItem:
 
 .global SystemScript_ObtainItemMessage
 SystemScript_ObtainItemMessage:
-	callasm ShowItemSpriteOnFindObtain
+	special SPECIAL_SHOW_ITEM_SPRITE_ON_FIND_OBTAIN
 	compare 0x8005 1
 	if lessorequal _call ObtainedSingleItemMsg
 	compare 0x8005 1
@@ -257,7 +274,7 @@ SystemScript_ObtainItemMessage:
 	waitmsg
 	msgbox 0x81A5218 MSG_KEEPOPEN @;[PLAYER] put the item in the...
 	setvar LASTRESULT 0x1
-	callasm ClearItemSpriteAfterFindObtain
+	special SPECIAL_CLEAR_ITEM_SPRITE_AFTER_FIND_OBTAIN
 	return
 
 ObtainedSingleItemMsg:
@@ -300,6 +317,42 @@ SystemScript_PickedUpHiddenItem: @;Replaces 81A6885
 	callasm ClearItemSpriteAfterFindHidden
 	special 0x96 @;SetHiddenItemFlag
 	incrementgamestat GAME_STAT_FOUND_HIDDEN_ITEM
+	releaseall
+	end
+
+@;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+.macro showselectitems num
+EventScript_ShowSelectItems\num:
+	multichoice 0x0 0x0 TWO_MULTICHOICE_OPTIONS + \num - 2 0x0
+	goto EventScript_ChooseSelectItem
+.endm
+
+.global EventScript_ShowSelectItems
+EventScript_ShowSelectItems:
+	lockall
+	preparemsg gText_UseWhichRegisteredItem
+	waitmsg
+	switch 0x8004
+	case 2, EventScript_ShowSelectItems2
+	case 3, EventScript_ShowSelectItems3
+	case 4, EventScript_ShowSelectItems4
+	case 5, EventScript_ShowSelectItems5
+	case 6, EventScript_ShowSelectItems6
+	releaseall
+	end
+
+showselectitems 2
+showselectitems 3
+showselectitems 4
+showselectitems 5
+showselectitems 6
+
+EventScript_ChooseSelectItem:
+	comparevars LASTRESULT 0x8004
+	if greaterorequal _goto .LEnd @Chose to cancel
+	callasm UseChosenRegisteredItem
+.LEnd:
 	releaseall
 	end
 

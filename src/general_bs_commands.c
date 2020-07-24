@@ -7,6 +7,7 @@
 #include "../include/string_util.h"
 #include "../include/constants/items.h"
 #include "../include/constants/songs.h"
+#include "../include/constants/trainer_classes.h"
 
 #include "../include/new/ability_battle_effects.h"
 #include "../include/new/ability_battle_scripts.h"
@@ -28,6 +29,7 @@
 #include "../include/new/item_battle_scripts.h"
 #include "../include/new/move_battle_scripts.h"
 #include "../include/new/move_tables.h"
+#include "../include/new/multi.h"
 #include "../include/new/pickup_items.h"
 #include "../include/new/stat_buffs.h"
 #include "../include/new/switching.h"
@@ -799,7 +801,8 @@ void atk0E_effectivenesssound(void)
 	if (IsDoubleSpreadMove())
 	{
 		if (gNewBS->doneDoublesSpreadHit
-		|| !gNewBS->calculatedSpreadMoveData) //The attack animation didn't play yet - only play sound after animation
+		|| !gNewBS->calculatedSpreadMoveData //The attack animation didn't play yet - only play sound after animation
+		|| SPLIT(gCurrentMove) == SPLIT_STATUS) //To handle Dark Void missing basically
 			goto END;
 		resultFlags = UpdateEffectivenessResultFlagsForDoubleSpreadMoves(resultFlags);
 	}
@@ -1178,9 +1181,10 @@ void atk19_tryfaintmon(void)
 			gHitMarker |= HITMARKER_FAINTED(gActiveBattler);
 			BattleScriptPush(gBattlescriptCurrInstr + 7);
 			gBattlescriptCurrInstr = BS_ptr;
-			if (SIDE(gActiveBattler) == B_SIDE_PLAYER)
+			if (SIDE(gActiveBattler) == B_SIDE_PLAYER
+			&& (!IsTagBattle() || GetBattlerPosition(gActiveBattler) == B_POSITION_OPPONENT_LEFT)) //Is player's mon
 			{
-				gHitMarker |= HITMARKER_x400000;
+				gHitMarker |= HITMARKER_PLAYER_FAINTED;
 				if (gBattleResults.playerFaintCounter < 0xFF)
 					gBattleResults.playerFaintCounter++;
 				AdjustFriendshipOnBattleFaint(gActiveBattler);
@@ -1255,7 +1259,7 @@ bool8 TryDoBenjaminButterfree(u8 scriptOffset)
 void atk1B_cleareffectsonfaint(void) {
 	gActiveBattler = GetBankForBattleScript(gBattlescriptCurrInstr[1]);
 	u8 partner = PARTNER(gActiveBattler);
-	pokemon_t* mon = GetBankPartyData(gActiveBattler);
+	struct Pokemon* mon = GetBankPartyData(gActiveBattler);
 
 	if (!gBattleExecBuffer) {
 		switch (gNewBS->faintEffectsState) {
@@ -1429,7 +1433,19 @@ void atk1B_cleareffectsonfaint(void) {
 					return;
 				}
 			#endif
-				break;
+				//Fallthrough
+			case Faint_LastPokemonMusic:
+				#ifdef BGM_BATTLE_GYM_LEADER_LAST_POKEMON
+				if ((gBattleTypeFlags & (BATTLE_TYPE_TRAINER | BATTLE_TYPE_DOUBLE)) == (BATTLE_TYPE_TRAINER | BATTLE_TYPE_DOUBLE) //Double Gym battle
+				&& !(gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_FRONTIER | BATTLE_TYPE_TRAINER_TOWER))
+				&& gTrainers[gTrainerBattleOpponent_A].trainerClass == CLASS_LEADER
+				&& ViableMonCount(gEnemyParty) <= 1)
+				{
+					PlayBGM(BGM_BATTLE_GYM_LEADER_LAST_POKEMON);
+				}
+				#endif
+				++gNewBS->faintEffectsState;
+				//Fallthrough
 
 			case Faint_FormsRevert:
 				if (TryFormRevert(mon))
@@ -1444,7 +1460,7 @@ void atk1B_cleareffectsonfaint(void) {
 
 			case Faint_FormsStats:
 				CalculateMonStats(mon);
-				EmitSetRawMonData(0, offsetof(pokemon_t, attack), 2 /*Atk*/ + 2 /*Def*/ + 2 /*Spd*/ + 2 */*Sp Atk*/ + 2 /*Sp Def*/, &mon->attack); //Reload all stats
+				EmitSetRawMonData(0, offsetof(struct Pokemon, attack), 2 /*Atk*/ + 2 /*Def*/ + 2 /*Spd*/ + 2 */*Sp Atk*/ + 2 /*Sp Def*/, &mon->attack); //Reload all stats
 				MarkBufferBankForExecution(gActiveBattler);
 				++gNewBS->faintEffectsState;
 				return;
@@ -1478,7 +1494,7 @@ void atk1D_jumpifstatus2(void) {
 	if (gBattlescriptCurrInstr[1] == BS_GET_TARGET && !MoveBlockedBySubstitute(gCurrentMove, gBankAttacker, bank))
 		flags &= ~(STATUS2_SUBSTITUTE);
 
-	if (gBattleMons[bank].status2 & flags && gBattleMons[bank].hp)
+	if (gBattleMons[bank].status2 & flags && BATTLER_ALIVE(bank))
 		gBattlescriptCurrInstr = jump_loc;
 	else
 		gBattlescriptCurrInstr += 10;
@@ -1694,6 +1710,10 @@ void atk45_playanimation(void)
 	|| 	gBattlescriptCurrInstr[2] == B_ANIM_ZMOVE_ACTIVATE
 	|| 	gBattlescriptCurrInstr[2] == B_ANIM_MEGA_EVOLUTION
 	|| 	gBattlescriptCurrInstr[2] == B_ANIM_ULTRA_BURST
+	|| 	gBattlescriptCurrInstr[2] == B_ANIM_ELECTRIC_SURGE
+	|| 	gBattlescriptCurrInstr[2] == B_ANIM_GRASSY_SURGE
+	|| 	gBattlescriptCurrInstr[2] == B_ANIM_MISTY_SURGE
+	|| 	gBattlescriptCurrInstr[2] == B_ANIM_PSYCHIC_SURGE
 	||  gBattlescriptCurrInstr[2] == B_ANIM_LOAD_DEFAULT_BG
 	||  gBattlescriptCurrInstr[2] == B_ANIM_LOAD_ABILITY_POP_UP
 	||  gBattlescriptCurrInstr[2] == B_ANIM_DESTROY_ABILITY_POP_UP
@@ -1770,6 +1790,10 @@ void atk46_playanimation2(void) // animation Id is stored in the first pointer
 	|| 	*animationIdPtr == B_ANIM_ZMOVE_ACTIVATE
 	|| 	*animationIdPtr == B_ANIM_MEGA_EVOLUTION
 	|| 	*animationIdPtr == B_ANIM_ULTRA_BURST
+	|| 	*animationIdPtr == B_ANIM_ELECTRIC_SURGE
+	|| 	*animationIdPtr == B_ANIM_GRASSY_SURGE
+	|| 	*animationIdPtr == B_ANIM_MISTY_SURGE
+	|| 	*animationIdPtr == B_ANIM_PSYCHIC_SURGE
 	||  *animationIdPtr == B_ANIM_LOAD_DEFAULT_BG
 	||  *animationIdPtr == B_ANIM_LOAD_ABILITY_POP_UP
 	||  *animationIdPtr == B_ANIM_DESTROY_ABILITY_POP_UP
@@ -1864,7 +1888,7 @@ void atk47_setgraphicalstatchangevalues(void)
 
 void atk5C_hitanimation(void)
 {
-    gActiveBattler = GetBankForBattleScript(gBattlescriptCurrInstr[1]);
+	gActiveBattler = GetBankForBattleScript(gBattlescriptCurrInstr[1]);
 
 	if (!IsDoubleSpreadMove())
 	{
@@ -1962,9 +1986,18 @@ void atk66_chosenstatusanimation(void) {
 	gBattlescriptCurrInstr += 7;
 }
 
-void atk6A_removeitem(void) {
+void atk6A_removeitem(void)
+{
 	u8 bank = gActiveBattler = GetBankForBattleScript(gBattlescriptCurrInstr[1]);
 	u8 oldItemEffect = ITEM_EFFECT(bank);
+	
+	if (gNewBS->doingPluckItemEffect) //This item removal was triggered by using someone else's item
+	{
+		gNewBS->doingPluckItemEffect = FALSE;
+		gBattlescriptCurrInstr += 2;
+		return;
+	}
+	
 	gLastUsedItem = gBattleMons[bank].item;
 
 	if (gLastUsedItem != ITEM_NONE)
@@ -3084,6 +3117,8 @@ void TransformPokemon(u8 bankAtk, u8 bankDef)
 		else
 			gBattleMons[bankAtk].pp[i] = 5;
 	}
+	
+	gNewBS->chiStrikeCritBoosts[bankAtk] = gNewBS->chiStrikeCritBoosts[bankDef];
 
 	gBattleCommunication[MULTISTRING_CHOOSER] = 0;
 	gBattleSpritesDataPtr->bankData[bankAtk].transformSpecies = species;
@@ -3208,15 +3243,15 @@ void atkA3_disablelastusedattack(void)
 
 	for (i = 0; i < MAX_MON_MOVES; i++)
 	{
-		if (gBattleMons[bankDef].moves[i] == gLastUsedMoves[gBankTarget])
+		if (gBattleMons[bankDef].moves[i] == gLastUsedMoves[bankDef])
 			break;
 	}
 
 	if (gDisableStructs[bankDef].disabledMove == 0
 	&& i != MAX_MON_MOVES
 	&& gBattleMons[bankDef].pp[i] != 0
-	&& !IsAnyMaxMove(gLastUsedMoves[gBankTarget])
-	&& !IsZMove(gLastUsedMoves[gBankTarget])
+	&& !IsAnyMaxMove(gLastUsedMoves[bankDef])
+	&& !IsZMove(gLastUsedMoves[bankDef])
 	&& !AbilityBattleEffects(ABILITYEFFECT_CHECK_BANK_SIDE, bankDef, ABILITY_AROMAVEIL, 0, 0))
 	{
 		PREPARE_MOVE_BUFFER(gBattleTextBuff1, gBattleMons[bankDef].moves[i])
@@ -4013,6 +4048,10 @@ void atkBD_copyfoestats(void) //Psych up
 		for (i = STAT_STAGE_ATK; i < BATTLE_STATS_NO; ++i)
 			STAT_STAGE(gBankAttacker, i) = STAT_STAGE(gBankTarget, i);
 
+		//Copy critical hit ratio
+		gBattleMons[gBankAttacker].status2 &= ~STATUS2_FOCUS_ENERGY; //Remove old boost if had
+		gBattleMons[gBankAttacker].status2 |= (gBattleMons[gBankTarget].status2 & STATUS2_FOCUS_ENERGY); //Give boost if opponent has
+		gNewBS->chiStrikeCritBoosts[gBankAttacker] = gNewBS->chiStrikeCritBoosts[gBankTarget];
 		gBattlescriptCurrInstr += 5;
 	}
 }
@@ -4368,18 +4407,18 @@ u16 GetNaturePowerMove(void)
 
 void atkCD_cureifburnedparalysedorpoisoned(void) // refresh
 {
-    if (gBattleMons[gBankAttacker].status1 & (STATUS1_POISON | STATUS1_BURN | STATUS1_PARALYSIS | STATUS1_TOXIC_POISON))
-    {
-        gBattleMons[gBankAttacker].status1 = 0;
-        gBattlescriptCurrInstr += 5;
-        gActiveBattler = gBankAttacker;
-        EmitSetMonData(0, REQUEST_STATUS_BATTLE, 0, 4, &gBattleMons[gActiveBattler].status1);
-        MarkBufferBankForExecution(gActiveBattler);
-    }
-    else
-    {
-        gBattlescriptCurrInstr = T1_READ_PTR(gBattlescriptCurrInstr + 1);
-    }
+	if (gBattleMons[gBankAttacker].status1 & (STATUS1_POISON | STATUS1_BURN | STATUS1_PARALYSIS | STATUS1_TOXIC_POISON))
+	{
+		gBattleMons[gBankAttacker].status1 = 0;
+		gBattlescriptCurrInstr += 5;
+		gActiveBattler = gBankAttacker;
+		EmitSetMonData(0, REQUEST_STATUS_BATTLE, 0, 4, &gBattleMons[gActiveBattler].status1);
+		MarkBufferBankForExecution(gActiveBattler);
+	}
+	else
+	{
+		gBattlescriptCurrInstr = T1_READ_PTR(gBattlescriptCurrInstr + 1);
+	}
 }
 
 void atkCE_settorment(void)

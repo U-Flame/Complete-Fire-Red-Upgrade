@@ -110,6 +110,7 @@ void atk04_critcalc(void)
 		else 
 		{
 			critChance  = 2 * ((gBattleMons[gBankAttacker].status2 & STATUS2_FOCUS_ENERGY) != 0)
+						+ gNewBS->chiStrikeCritBoosts[gBankAttacker]
 						+ (CheckTableForMove(gCurrentMove, gHighCriticalChanceMoves))
 						+ (atkEffect == ITEM_EFFECT_SCOPE_LENS)
 						+ (atkAbility == ABILITY_SUPERLUCK)
@@ -195,6 +196,7 @@ static u8 CalcPossibleCritChance(u8 bankAtk, u8 bankDef, u16 move, struct Pokemo
 
 	else {
 		critChance  = 2 * ((atkStatus2 & STATUS2_FOCUS_ENERGY) != 0)
+					+ gNewBS->chiStrikeCritBoosts[bankAtk]
 					+ (CheckTableForMove(move, gHighCriticalChanceMoves))
 					+ (atkEffect == ITEM_EFFECT_SCOPE_LENS)
 					+ (atkAbility == ABILITY_SUPERLUCK)
@@ -1960,6 +1962,8 @@ static s32 CalculateBaseDamage(struct DamageCalc* data)
 
 		if (useMonDef)
 			data->resultFlags = AI_TypeCalc(move, bankAtk, data->monDef);
+		else if (data->specialFlags & FLAG_AI_CALC)
+			data->resultFlags = AI_SpecialTypeCalc(move, bankAtk, bankDef); //Takes into account things like Illusion
 		else
 			data->resultFlags = TypeCalc(move, bankAtk, bankDef, NULL, FALSE);
 	}
@@ -3089,7 +3093,12 @@ static u16 GetBasePower(struct DamageCalc* data)
 			if (gTerrainType == ELECTRIC_TERRAIN && data->defIsGrounded)
 				power *= 2;
 			break;
-		
+
+		case MOVE_EXPANDINGFORCE:
+			if (gTerrainType == PSYCHIC_TERRAIN && data->atkIsGrounded)
+				power = (power * 15) / 10;
+			break;
+
 		case MOVE_MISTYEXPLOSION:
 			if (gTerrainType == MISTY_TERRAIN && data->atkIsGrounded)
 				power = (power * 15) / 10;
@@ -3383,18 +3392,24 @@ static u16 AdjustBasePower(struct DamageCalc* data, u16 power)
 	if (data->atkStatus3 & STATUS3_CHARGED_UP && data->moveType == TYPE_ELECTRIC)
 		power *= 2;
 
+	#ifdef OLD_TERRAIN_BOOST
+		#define TERRAIN_BOOST 15 //1.5x in Gen 6 & 7
+	#else
+		#define TERRAIN_BOOST 13 //1.3x in Gen 8
+	#endif
+
 	//Terrain Checks
 	switch (gTerrainType) {
 		case ELECTRIC_TERRAIN:
 		//1.5x Boost
 			if (data->atkIsGrounded && data->moveType == TYPE_ELECTRIC)
-				power = (power * 15) / 10;
+				power = (power * TERRAIN_BOOST) / 10;
 			break;
 
 		case GRASSY_TERRAIN:
 		//1.5x / 0.5 Boost
 			if (data->atkIsGrounded && data->moveType == TYPE_GRASS)
-				power = (power * 15) / 10;
+				power = (power * TERRAIN_BOOST) / 10;
 
 			if ((move == MOVE_MAGNITUDE || move == MOVE_EARTHQUAKE || move == MOVE_BULLDOZE)
 			&& !(data->defStatus3 & STATUS3_SEMI_INVULNERABLE))
@@ -3409,13 +3424,8 @@ static u16 AdjustBasePower(struct DamageCalc* data, u16 power)
 
 		case PSYCHIC_TERRAIN:
 		//1.5x Boost
-			if (data->atkIsGrounded)
-			{
-				if (move == MOVE_EXPANDINGFORCE)
-					power *= 2;
-				if (data->moveType == TYPE_PSYCHIC)
-					power = (power * 15) / 10;
-			}
+			if (data->atkIsGrounded && data->moveType == TYPE_PSYCHIC)
+				power = (power * TERRAIN_BOOST) / 10;
 			break;
 	}
 

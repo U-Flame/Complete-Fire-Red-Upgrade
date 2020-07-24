@@ -10,6 +10,9 @@ playanimation_table.s
 	table of extra animations
 */
 
+.equ FALSE, 0
+.equ TRUE, 1
+
 .global gBattleAnims_General
 
 gBattleAnims_General:
@@ -48,7 +51,7 @@ gBattleAnims_General:
 .word 0x81d657b	@ ANIM_TURN_INTO_POKEBALL
 .word 0x81d6594	@ ANIM_SWITCH
 .word 0x81d659e	@ ANIM_CREATE_SUBSTITUTE_2
-.word 0x81d2811 @ ANIM_TRANSFORM
+.word ANIM_TRANSFORM
 .word ANIM_WISHIWASHI_FISH
 .word ANIM_ZYGARDE_CELL_SWIRL
 .word ANIM_DELTA_STREAM
@@ -86,7 +89,9 @@ gBattleAnims_General:
 .word ANIM_DYNAMAX_ENERGY_SWIRL
 .word ANIM_RAID_BATTLE_STORM
 .word ANIM_RAID_BATTLE_ENERGY_BURST
+.word ANIM_G_MAX_VINE_LASH
 .word ANIM_G_MAX_WILDFIRE
+.word ANIM_G_MAX_CANNONADE
 .word ANIM_G_MAX_VOLCALITH
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -143,6 +148,17 @@ ANIM_WRAPPED_END_TURN:
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 .pool
+ANIM_TRANSFORM:
+	pokespritetoBG bank_attacker 
+	playsound2 0xc4 SOUND_PAN_ATTACKER 
+	playsoundwait 0xc5 SOUND_PAN_ATTACKER 0x30 
+	launchtask AnimTask_sprite_transform 0x2 0x1 0xFE
+	waitanimation 
+	pokespritefromBG bank_attacker 
+	endanimation
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+.pool
 ANIM_WISHIWASHI_FISH:
 	loadparticle ANIM_TAG_WISHIWASHI_FISH @Fish
 	loadparticle ANIM_TAG_SMALL_BUBBLES @Bubbles
@@ -150,7 +166,7 @@ ANIM_WISHIWASHI_FISH:
 	pokespritetoBG bank_attacker
 	leftbankBG_over_partnerBG bank_attacker
 	call WISHIWASHI_SWIRL_PARTICLES
-	launchtask AnimTask_sprite_transform 0x2 0x1 0x0
+	launchtask AnimTask_sprite_transform 0x2 0x1 0xFE
 	call WISHIWASHI_SWIRL_PARTICLES
 	call WISHIWASHI_SWIRL_PARTICLES
 	waitanimation
@@ -209,7 +225,7 @@ ANIM_ZYGARDE_CELL_SWIRL:
 	launchtemplate ZYGARDE_CELL 0x82 0x5 0x73 0x28 0xa 0x30 0x1e
 	pause 0x3
 	playsound2 0xe3 SOUND_PAN_ATTACKER
-	launchtask AnimTask_sprite_transform 0x2 0x1 0x0
+	launchtask AnimTask_sprite_transform 0x2 0x1 0xFE
 	launchtemplate ZYGARDE_CELL 0x82 0x5 0x78 0x1e 0x6 0x2d 0x19
 	launchtemplate ZYGARDE_CELL 0x82 0x5 0x73 0x23 0xa 0x3c 0x1e
 	pause 0x3
@@ -998,9 +1014,23 @@ ANIM_RAID_BATTLE_ENERGY_BURST:
 	endanimation
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-.pool		
+.pool
+ANIM_G_MAX_VINE_LASH:
+	loadparticle ANIM_TAG_UNUSED_VINE_2
+	launchtask AnimTask_move_bank 0x2 0x5 bank_target 0x3 0x0 17 0x1
+	call POWER_WHIP
+	call POWER_WHIP
+	call POWER_WHIP
+	waitanimation
+	endanimation
+
+.pool
 ANIM_G_MAX_WILDFIRE:
 	goto 0x81d5cd3 @Fire Spin
+
+.pool
+ANIM_G_MAX_CANNONADE:
+	goto 0x81cfb3a @Whirlpool
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 .pool	

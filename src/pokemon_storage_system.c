@@ -1,12 +1,17 @@
 #include "defines.h"
 #include "../include/event_data.h"
+#include "../include/pokemon_icon.h"
 #include "../include/pokemon_storage_system.h"
+#include "../include/pokemon_storage_system_internal.h"
+#include "../include/string_util.h"
+#include "../include/text.h"
 #include "../include/constants/flags.h"
 #include "../include/constants/vars.h"
 
 #include "../include/new/build_pokemon.h"
 #include "../include/new/form_change.h"
 #include "../include/new/frontier.h"
+#include "../include/new/item.h"
 #include "../include/new/pokemon_storage_system.h"
 /*
 pokemon_storage_system.c
@@ -454,7 +459,65 @@ void RestorePartyFromTempTeam(u8 firstId, u8 numPokes)
 
 	for (int i = 0; i < numPokes; ++i)
 	{
+		Memset(&gPlayerParty[firstId + i], 0, sizeof(struct Pokemon)); //Wipe old data - mainly for wiping struct data that's not included in Box mon *IMPORTANT
 		CreateBoxMonFromCompressedMon((struct BoxPokemon*) &gPlayerParty[firstId + i], &backup[firstId + i]);
 		CalculateMonStats(&gPlayerParty[firstId + i]);
+	}
+}
+
+u16 __attribute__((long_call)) sub_80911D4(u16 species);
+void __attribute__((long_call)) LoadCursorMonSprite(void);
+void __attribute__((long_call)) RefreshCursorMonData(void);
+void PlaceBoxMonIcon(u8 boxId, u8 position)
+{
+    if (boxId >= TOTAL_BOXES_COUNT) //Party mon
+    {
+        gPSSData->partySprites[position] = gPSSData->movingMonSprite;
+        gPSSData->partySprites[position]->oam.priority = 1;
+        gPSSData->partySprites[position]->subpriority = 12;
+    }
+    else
+    {
+		u16 species = GetBoxMonDataAt(boxId, position, MON_DATA_SPECIES);
+	
+		#if (defined SPECIES_HOOPA || defined SPECIES_SHAYMIN)
+		//Try an instant sprite change for post placing Hoopa-Unbound or Shaymin-Sky in the PC
+		if (species == SPECIES_HOOPA || species == SPECIES_SHAYMIN)
+		{
+			u16 tileNum = sub_80911D4(species); //Gets the tile number of the mon icon
+			if (tileNum != 0xFFFF)
+			{
+				//Update mon Icon
+				gPSSData->movingMonSprite->oam.tileNum = tileNum;
+				gPSSData->movingMonSprite->oam.paletteNum = IndexOfSpritePaletteTag(0xDAC0 + GetMonIconPaletteIndexFromSpecies(species));
+			}
+
+			//Update front sprite
+			u32 otId = GetBoxMonDataAt(boxId, position, MON_DATA_OT_ID);
+			gPSSData->cursorMonSpecies = species;
+			gPSSData->cursorMonPalette = GetMonSpritePalFromSpeciesAndPersonality(gPSSData->cursorMonSpecies, otId, gPSSData->cursorMonPersonality);
+			RefreshCursorMonData();
+		}
+		#endif
+
+        gPSSData->boxMonsSprites[position] = gPSSData->movingMonSprite;
+        gPSSData->boxMonsSprites[position]->oam.priority = 2;
+        gPSSData->boxMonsSprites[position]->subpriority = 19 - (position % IN_BOX_ROWS);
+    }
+
+    gPSSData->movingMonSprite->callback = SpriteCallbackDummy;
+    gPSSData->movingMonSprite = NULL;
+}
+
+void FixItemNameInPokemonStorageSystem(void)
+{
+	const u8* name = ItemId_GetName(gPSSData->cursorMonItem);
+	u8 length = StringLength(name);
+
+	StringCopyPadded(gPSSData->cursorMonTexts[3], name, CHAR_SPACE, 14);
+	if (length >= 14) //Too long to look nice
+	{
+		gPSSData->cursorMonTexts[3][12] = CHAR_ELLIPSIS; //End with trailing ...
+		gPSSData->cursorMonTexts[3][13] = EOS;
 	}
 }

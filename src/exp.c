@@ -168,12 +168,14 @@ void atk23_getexp(void)
 		}
 
 		//Trainer Boost - a
+		trainerBonus = 10;
 		#ifdef TRAINER_EXP_BOOST
-			trainerBonus = 10;
-			if (gBattleTypeFlags & BATTLE_TYPE_TRAINER)
+			if (gBattleTypeFlags & BATTLE_TYPE_TRAINER
+			#ifdef UNBOUND
+			&& FlagGet(FLAG_SYS_GAME_CLEAR) //Too OP before game end
+			#endif
+			)
 				trainerBonus = 15;
-		#else
-			trainerBonus = 10;
 		#endif
 
 		//Trade Boost - t
@@ -507,7 +509,7 @@ static bool8 MonGetsAffectionBoost(struct Pokemon* mon)
 	{
 		#ifdef EXP_AFFECTION_BOOST
 			#ifdef UNBOUND
-			if (FlagGet(FLAG_SYS_GAME_CLEAR)) //Too OP before game end
+			if (VarGet(VAR_GAME_DIFFICULTY) == OPTIONS_EASY_DIFFICULTY || FlagGet(FLAG_SYS_GAME_CLEAR)) //Too OP before game end
 			#endif
 				return TRUE;
 		#endif

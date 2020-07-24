@@ -25,7 +25,7 @@ set_effect_battle_scripts.s
 .global BattleScript_MaxMoveParalyzeFoes
 .global BattleScript_MaxMovePoisonFoes
 .global BattleScript_MaxMovePayDayConfuseFoes
-.global BattleScript_MaxMoveFocusEnergy
+.global BattleScript_MaxMoveCritUp
 .global BattleScript_MaxMoveTrap
 .global BattleScript_MaxMoveInfatuation
 .global BattleScript_MaxMoveRecycle
@@ -129,8 +129,11 @@ BattleScript_StatUpPartner:
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMoveRaiseStatTeam:
+	jumpiffainted BANK_ATTACKER BattleScript_MaxMoveRaiseStatTeam_CheckPartner
 	callasm SetMaxMoveStatRaiseEffect
 	seteffectprimary
+
+BattleScript_MaxMoveRaiseStatTeam_CheckPartner:
 	jumpifnotbattletype BATTLE_DOUBLE BattleScript_MaxMoveEffectEnd
 	callasm SetAttackerPartner
 	jumpiffainted BANK_ATTACKER BattleScript_MaxMoveSetAttackerBackAndReturn
@@ -143,8 +146,11 @@ BattleScript_MaxMoveSetAttackerBackAndReturn:
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMoveLowerStatFoes:
+	jumpiffainted BANK_TARGET BattleScript_MaxMoveLowerStatFoes_CheckPartner
 	callasm SetMaxMoveStatLowerEffect
 	seteffectprimary
+
+BattleScript_MaxMoveLowerStatFoes_CheckPartner:
 	jumpifnotbattletype BATTLE_DOUBLE BattleScript_MaxMoveEffectEnd
 	callasm SetTargetFoePartner
 	jumpiffainted BANK_TARGET BattleScript_MaxMoveSetTargetBackAndReturn
@@ -179,8 +185,11 @@ BattleScript_MaxMoveSetTerrain:
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMoveEffectSporeFoes:
+	jumpiffainted BANK_TARGET BattleScript_MaxMoveEffectSporeFoes_CheckPartner
 	callasm PickRandomGMaxBefuddleEffect
 	seteffectsecondary
+
+BattleScript_MaxMoveEffectSporeFoes_CheckPartner:
 	jumpifnotbattletype BATTLE_DOUBLE BattleScript_MaxMoveEffectEnd
 	callasm SetTargetFoePartner
 	jumpiffainted BANK_TARGET BattleScript_MaxMoveSetTargetBackAndReturn
@@ -192,8 +201,11 @@ BattleScript_MaxMoveEffectSporeFoes:
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMoveParalyzeFoes:
+	jumpiffainted BANK_TARGET BattleScript_MaxMoveParalyzeFoes_CheckPartner
 	callasm SetGMaxVoltCrashEffect
 	seteffectsecondary
+
+BattleScript_MaxMoveParalyzeFoes_CheckPartner:
 	jumpifnotbattletype BATTLE_DOUBLE BattleScript_MaxMoveEffectEnd
 	callasm SetTargetFoePartner
 	jumpiffainted BANK_TARGET BattleScript_MaxMoveSetTargetBackAndReturn
@@ -211,38 +223,54 @@ BattleScript_MaxMovePayDayConfuseFoes:
 
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-BattleScript_MaxMoveFocusEnergy:
-	jumpiffainted BANK_ATTACKER BS_MaxMoveFocusEnergy_CheckPartner
-	jumpifsecondarystatus BANK_ATTACKER STATUS2_PUMPEDUP BS_MaxMoveFocusEnergy_CheckPartner
-	setincreasedcriticalchance
+BattleScript_MaxMoveCritUp:
+	jumpiffainted BANK_ATTACKER BS_MaxMoveCritUp_CheckPartner
+	jumpifmaxchistrikecapped BANK_ATTACKER BS_MaxMoveCritUp_CheckPartner
+	callasm SetGMaxChiStrikeEffect
 	printfromtable 0x83FE5B0
 	waitmessage DELAY_1SECOND
 
-BS_MaxMoveFocusEnergy_CheckPartner:
+BS_MaxMoveCritUp_CheckPartner:
 	jumpifnotbattletype BATTLE_DOUBLE BattleScript_MaxMoveEffectEnd
 	callasm SetAttackerPartner
-	jumpiffainted BANK_ATTACKER BS_MaxMoveFocusEnergy_RestoreOriginalAttacker
-	jumpifsecondarystatus BANK_ATTACKER STATUS2_PUMPEDUP BS_MaxMoveFocusEnergy_RestoreOriginalAttacker
-	setincreasedcriticalchance
+	jumpiffainted BANK_ATTACKER BS_MaxMoveCritUp_RestoreOriginalAttacker
+	jumpifmaxchistrikecapped BANK_ATTACKER BS_MaxMoveCritUp_RestoreOriginalAttacker
+	callasm SetGMaxChiStrikeEffect
 	printfromtable 0x83FE5B0
 	waitmessage DELAY_1SECOND
 
-BS_MaxMoveFocusEnergy_RestoreOriginalAttacker:
+BS_MaxMoveCritUp_RestoreOriginalAttacker:
 	callasm SetAttackerPartner
 	return
 
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMoveTrap:
+	jumpiffainted BANK_TARGET BattleScript_MaxMoveTrap_CheckPartner
+	jumpifsecondarystatus BANK_TARGET STATUS2_TRAPPED BattleScript_MaxMoveTrap_CheckPartner
+	jumpiftype BANK_TARGET TYPE_GHOST BattleScript_MaxMoveTrap_CheckPartner
 	setmoveeffect MOVE_EFFECT_PREVENT_ESCAPE
 	seteffectprimary
 	printstring 0x8F @;STRINGID_TARGETCANTESCAPENOW
 	waitmessage DELAY_1SECOND
-	return
 
+BattleScript_MaxMoveTrap_CheckPartner:
+	jumpifnotbattletype BATTLE_DOUBLE BattleScript_MaxMoveEffectEnd
+	callasm SetTargetFoePartner
+	jumpiffainted BANK_TARGET BattleScript_MaxMoveSetTargetBackAndReturn
+	jumpifsecondarystatus BANK_TARGET STATUS2_TRAPPED BattleScript_MaxMoveSetTargetBackAndReturn
+	jumpiftype BANK_TARGET TYPE_GHOST BattleScript_MaxMoveSetTargetBackAndReturn
+	setmoveeffect MOVE_EFFECT_PREVENT_ESCAPE
+	seteffectprimary
+	printstring 0x8F @;STRINGID_TARGETCANTESCAPENOW
+	waitmessage DELAY_1SECOND
+	callasm SetTargetFoePartner
+	return
+	
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMoveInfatuation:
+	jumpiffainted BANK_TARGET BS_MaxMoveInfatuation_CheckPartner
 	tryinfatuatebank BANK_TARGET BS_MaxMoveInfatuation_CheckPartner
 	status2animation BANK_TARGET STATUS2_INLOVE
 	printstring 0x45
@@ -331,8 +359,11 @@ BS_MaxMoveHealTeam_RestoreOriginalAttacker:
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMovePoisonFoes:
+	jumpiffainted BANK_TARGET BattleScript_MaxMovePoisonFoes_CheckPartner
 	callasm SetGMaxMalodorEffect
 	seteffectsecondary
+
+BattleScript_MaxMovePoisonFoes_CheckPartner:
 	jumpifnotbattletype BATTLE_DOUBLE BattleScript_MaxMoveEffectEnd
 	callasm SetTargetFoePartner
 	jumpiffainted BANK_TARGET BattleScript_MaxMoveSetTargetBackAndReturn
@@ -359,8 +390,11 @@ BattleScript_MaxMoveDefog:
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMovePoisonParalyzeFoes:
+	jumpiffainted BANK_TARGET BattleScript_MaxMovePoisonParalyzeFoes_CheckPartner
 	callasm PickRandomGMaxStunshockEffect
 	seteffectsecondary
+
+BattleScript_MaxMovePoisonParalyzeFoes_CheckPartner:
 	jumpifnotbattletype BATTLE_DOUBLE BattleScript_MaxMoveEffectEnd
 	callasm SetTargetFoePartner
 	jumpiffainted BANK_TARGET BattleScript_MaxMoveSetTargetBackAndReturn
@@ -372,6 +406,7 @@ BattleScript_MaxMovePoisonParalyzeFoes:
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMoveSpite:
+	jumpiffainted BANK_TARGET BattleScript_MaxMoveEffectEnd
 	printstring 0x8D
 	waitmessage DELAY_1SECOND
 	return
@@ -395,8 +430,11 @@ BattleScript_MaxMoveSetYawn:
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMoveTrapAndDamageFoes:
+	jumpiffainted BANK_TARGET BattleScript_MaxMoveTrapAndDamageFoes_CheckPartner
 	setmoveeffect MOVE_EFFECT_WRAP
 	seteffectprimary
+
+BattleScript_MaxMoveTrapAndDamageFoes_CheckPartner:
 	jumpifnotbattletype BATTLE_DOUBLE BattleScript_MaxMoveEffectEnd
 	callasm SetTargetFoePartner
 	jumpiffainted BANK_TARGET BattleScript_MaxMoveSetTargetBackAndReturn
@@ -408,8 +446,11 @@ BattleScript_MaxMoveTrapAndDamageFoes:
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMoveLowerEvasivenessFoes:
+	jumpiffainted BANK_TARGET BattleScript_MaxMoveLowerEvasivenessFoes_CheckPartner
 	setmoveeffect MOVE_EFFECT_EVS_MINUS_1
 	seteffectprimary
+
+BattleScript_MaxMoveLowerEvasivenessFoes_CheckPartner:
 	jumpifnotbattletype BATTLE_DOUBLE BattleScript_MaxMoveEffectEnd
 	callasm SetTargetFoePartner
 	jumpiffainted BANK_TARGET BattleScript_MaxMoveSetTargetBackAndReturn
@@ -431,8 +472,11 @@ BattleScript_MaxMoveAromatherapy:
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMoveConfuseFoes:
+	jumpiffainted BANK_TARGET BattleScript_MaxMoveConfuseFoes_CheckPartner
 	callasm SetGMaxSmiteEffect
 	seteffectprimary
+
+BattleScript_MaxMoveConfuseFoes_CheckPartner:
 	jumpifnotbattletype BATTLE_DOUBLE BattleScript_MaxMoveEffectEnd
 	callasm SetTargetFoePartner
 	jumpiffainted BANK_TARGET BattleScript_MaxMoveSetTargetBackAndReturn
@@ -444,11 +488,11 @@ BattleScript_MaxMoveConfuseFoes:
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMoveTormentFoes:
-	settorment BS_MaxMoveTormentFoes_TryPartner
+	settorment BattleScript_MaxMoveTormentFoes_TryPartner
 	printstring 0xA9 @;STRINGID_PKMNSUBJECTEDTOTORMENT
 	waitmessage DELAY_1SECOND
 
-BS_MaxMoveTormentFoes_TryPartner:
+BattleScript_MaxMoveTormentFoes_TryPartner:
 	jumpifnotbattletype BATTLE_DOUBLE BattleScript_MaxMoveEffectEnd
 	callasm SetTargetFoePartner
 	jumpiffainted BANK_TARGET BattleScript_MaxMoveSetTargetBackAndReturn
@@ -461,8 +505,11 @@ BS_MaxMoveTormentFoes_TryPartner:
 @;@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 BattleScript_MaxMoveLowerSpeed2Foes:
+	jumpiffainted BANK_TARGET BattleScript_MaxMoveLowerSpeed2Foes_CheckPartner
 	setmoveeffect MOVE_EFFECT_SPD_MINUS_2
 	seteffectprimary
+
+BattleScript_MaxMoveLowerSpeed2Foes_CheckPartner:
 	jumpifnotbattletype BATTLE_DOUBLE BattleScript_MaxMoveEffectEnd
 	callasm SetTargetFoePartner
 	jumpiffainted BANK_TARGET BattleScript_MaxMoveSetTargetBackAndReturn
@@ -472,6 +519,6 @@ BattleScript_MaxMoveLowerSpeed2Foes:
 	return
 
 .align 2
-SlappedAwakeString: .byte 0xFD, 0x10, 0x00, 0xEB, 0xD5, 0xE7, 0x00, 0xE7, 0xE0, 0xD5, 0xE4, 0xE4, 0xD9, 0xD8, 0xFE, 0xD5, 0xEB, 0xD5, 0xDF, 0xD9, 0xAB
+SlappedAwakeString: .byte 0xFD, 0x10, 0x00, 0xEB, 0xD5, 0xE7, 0x00, 0xE7, 0xE0, 0xD5, 0xE4, 0xE4, 0xD9, 0xD8, 0xFE, 0xD5, 0xEB, 0xD5, 0xDF, 0xD9, 0xAB, 0xFF
 BurnCuredString: .byte 0xFD, 0x10, 0xB4, 0xE7, 0x00, 0xD6, 0xE9, 0xE6, 0xE2, 0xFE, 0xEB, 0xD5, 0xE7, 0x00, 0xDC, 0xD9, 0xD5, 0xE0, 0xD9, 0xD8, 0xAB, 0xFF
 ItemCantBeRemovedString: .byte 0xFD, 0x10, 0xB4, 0xE7, 0x00, 0xDD, 0xE8, 0xD9, 0xE1, 0xFE, 0xD7, 0xD5, 0xE2, 0xB4, 0xE8, 0x00, 0xD6, 0xD9, 0x00, 0xE6, 0xD9, 0xE1, 0xE3, 0xEA, 0xD9, 0xD8, 0xAB, 0xFF

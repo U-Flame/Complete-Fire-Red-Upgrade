@@ -148,6 +148,14 @@ HiddenAbilityChange4_2:
 MaxLevelChange14:
 	.byte MAX_LEVEL - 1
 
+.org 0x343D4, 0xFF
+TransformedPersonalityOpponentFix:
+	mov r2, r6 @Use current personality
+
+.org 0x34594, 0xFF
+TransformedPersonalityPlayerFix:
+	mov r2, r4 @Use current personality
+
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 @ AI Vanilla Item Use Bug Fix
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -262,6 +270,35 @@ OverworldBasic:
 	bl 0xF67B8 @DoScheduledBgTilemapCopiesToVram
 	bl 0x6BA8 @BuildOamBuffer
 	pop {pc}
+
+.org 0x59F20, 0xFF
+VeryTallGrassFix:
+	mov r8, r8
+	lsl r0, #0x18
+	lsr r0, #0x18
+	cmp r0, #0x16
+	beq 0x59F2E
+	mov r0, #0x0
+	b 0x59F30
+	mov r0, #0x1
+	bx lr
+	mov r8, r8
+
+	mov r8, r8
+	lsl r0, #0x18
+	lsr r0, #0x18
+	cmp r0, #0x2
+	beq 0x59F42
+	cmp r0, #0xD1
+	bne 0x59F46
+	mov r0, #0x1
+	b 0x59F48
+	mov r0, #0x0
+	bx lr
+	mov r8, r8
+
+	cmp r0, #0x3
+	b 0x59F28
 */
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -299,6 +336,13 @@ OverworldBasic:
 .org 0x5D916, 0xFF	@16 bit sprite ids
 	lsl r1, #0x10
 	lsr r1, #0x10
+
+.org 0x5E510, 0xFF @RemoveEventObjectInternal
+	push {r4, lr}
+	sub sp, #0x8
+	mov r4, r0
+	mov r0, r4
+	bl GetEventObjectGraphicsInfoByEventObj
 
 .org 0x5e5d4, 0xff
 	.byte 0x8, 0x47		@ routine_ptr+1 at 5e5f4
@@ -362,7 +406,46 @@ OverworldBasic:
 		
 .org 0x5f658, 0xff	@don't auto-load NPC palettes into slot 0 or 0xA
 	bx lr
-	
+
+.org 0x5f744, 0xFF @MoveEventObjectToMapCoords
+	mov r0, r6
+	bl GetEventObjectGraphicsInfoByEventObj
+
+.org 0x668DA, 0xFF @MovementAction_RestoreAnimation_Step0
+	mov r0, r4
+	bl GetEventObjectGraphicsInfoByEventObj
+
+.org 0x67A12, 0xFF @npc_offscreen_culling
+	mov r5, r0
+	mov r4, r1
+	ldrb r1, [r5, #0x1]
+	mov r0, #0x41
+	neg r0, r0
+	and r0, r1
+	strb r0, [r5, #0x1]
+	mov r0, r5
+	bl GetEventObjectGraphicsInfoByEventObj
+
+.org 0x67F92, 0xFF @EventObjectCheckForReflectiveSurface
+	mov r5, r0
+	mov r0, r5
+	bl GetEventObjectGraphicsInfoByEventObj
+	mov r4, #0x0
+	mov r0, #0x1
+	mov r10, r0
+
+.org 0x684DA, 0xFF @GroundEffect_SandTracks
+	mov r0, r4
+	bl GetEventObjectGraphicsInfoByEventObj
+
+.org 0x68506, 0xFF @GroundEffect_DeepSandTracks
+	mov r0, r4
+	bl GetEventObjectGraphicsInfoByEventObj
+
+.org 0x69310, 0xFF @DoRippleFieldEffect
+	mov r0, r0
+	bl GetEventObjectGraphicsInfoByEventObj
+
 .org 0x79c18, 0xff	@don't load rain palette on entering map
 	.byte 0x0, 0x25, 0xe, 0xe0
 

@@ -84,7 +84,8 @@ GetPokeBallBattleScriptHook:
 	cmp r0, #0x0
 	pop {r3}
 	bne SuccessfullBallBattleScript
-	ldr r0, =0x801649C | 1
+	mov r1, r3
+	ldr r0, =0x801649C | 1 @Check Poke Doll
 	bx r0
 
 SuccessfullBallBattleScript:
@@ -283,6 +284,13 @@ DoubleWildUseItemRunFixHook:
 SkipEncoreReturn:
 	ldr r0, =0x801432C | 1
 	bx r0
+
+.pool
+@0x806FC84 with r0
+LinkBattleSaveHook:
+	bl SaveDataAfterLinkBattle
+	ldr r1, =0x806FCE6 | 1
+	bx r1
 
 .pool
 @0x8054A60 with r0
@@ -558,6 +566,13 @@ SwapBoxMonMovesUpdate2:
 	mov r9, r4
 	mov r10, r5
 	pop {r4-r7,pc}
+
+.pool
+@0x8093F58 with r3
+ExpandedItemNameFixPokemonStorageSystemHook:
+	bl FixItemNameInPokemonStorageSystem
+	ldr r0, =0x8093F85 | 1
+	bx r0
 
 .pool
 @0x80D860C with r0
@@ -860,23 +875,6 @@ ModifyMegaCryHook:
 	pop {r0,r2}
 	ldr r3, =0x8071F98 | 1
 	bx r3
-
-@0x8122A9A with r0
-DisablePartyMenuListItemsBattleSalon:
-	bl ShouldDisablePartyMenuItemsBattleTower
-	cmp r0, #0x0
-	bne SkipAddPartyMenuListItems
-	ldr r0, [sp, #0x4]
-	mov r1, #0xB @species
-	ldr r2, =GetMonData
-	bl bxr2
-	cmp r0, #0x0
-	ldr r1, =0x8122AA4 | 1
-	bx r1
-
-SkipAddPartyMenuListItems:
-	ldr r0, =0x8122AFC | 1
-	bx r0
 
 @0x8136168 with r0
 CamomonsSummaryScreenHook:
@@ -1201,4 +1199,56 @@ SuctionCupsHook:
 
 NoFishBiting:
 	ldr r0, =0x805D53A | 1
+	bx r0
+
+.pool
+@0x809D2FC with r3
+RandomizerShowPokepicHook:
+	lsl r1, r1, #0x18
+	lsr r7, r1, #0x18
+	lsl r2, r2, #0x18
+	lsr r6, r2, #0x18
+	mov r0, r8
+	bl GetRandomizedSpecies
+	mov r8, r0
+	ldr r0, =0x809D304 | 1
+	bx r0
+
+.pool
+@0x806C9AC with r0
+FieldGetPlayerInputLButtonHook:
+	mov r0, r5
+	ldrh r1, [sp]
+	bl FieldCheckIfPlayerPressedLButton
+	ldr r0, =0x0806C9BA | 1
+	bx r0
+
+.pool
+@0x806CCFC with r0
+UseRegisteredItemHook:
+	mov r0, r5
+	bl ProcessNewFieldPlayerInput
+	ldr r1, =0x0806CD22 | 1
+	bx r1
+
+.pool
+@0x8041798 with r0
+XSpDefStatBoostHook:
+	ldr r0, [sp, #0x8] @Item
+	mov r1, r3 @Boost amount
+	bl NewXSpecialBoost
+	mov r1, r0 @retVal
+	ldr r0, =0x80417CA | 1
+	bx r0
+
+.pool
+@0x8016650 with r0
+AIXItemStringHook:
+	bl PrepareStringForAIUsingXItem
+	ldr r0, =gBattlescriptCurrInstr
+	mov r9, r0
+	ldr r0, =gCurrentActionFuncId
+	mov r10, r0
+	ldr r6, =0x81D99E4
+	ldr r0, =0x8016706 | 1
 	bx r0

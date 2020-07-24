@@ -480,15 +480,9 @@ extern u8 gAbsentBattlerFlags;
 
 // script's table id to bit
 #define AI_SCRIPT_CHECK_BAD_MOVE (1 << 0)
-#define AI_SCRIPT_CHECK_GOOD_MOVE (1 << 1)
-#define AI_SCRIPT_CHECK_VIABILITY (1 << 2)
-#define AI_SCRIPT_SETUP_FIRST_TURN (1 << 3)
-#define AI_SCRIPT_RISKY (1 << 4)
-#define AI_SCRIPT_PREFER_STRONGEST_MOVE (1 << 5)
-#define AI_SCRIPT_PREFER_BATON_PASS (1 << 6)
-#define AI_SCRIPT_DOUBLE_BATTLE (1 << 7)
-#define AI_SCRIPT_HP_AWARE (1 << 8)
-#define AI_SCRIPT_UNKNOWN (1 << 9)
+#define AI_SCRIPT_SEMI_SMART (1 << 1)
+#define AI_SCRIPT_CHECK_GOOD_MOVE (1 << 2)
+
 // 10 - 28 are not used
 #define AI_SCRIPT_ROAMING (1 << 29)
 #define AI_SCRIPT_SAFARI (1 << 30)
@@ -561,7 +555,7 @@ struct BattleResources
     struct StatsArray* statsBeforeLvlUp;
     struct AI_ThinkingStruct *ai;
     struct BattleHistory *battleHistory;
-    struct BattleScriptsStack *AI_ScriptsStack;
+    struct BattleScriptsStack *AIScriptsStack;
  //   u8 bufferA[MAX_BATTLERS_COUNT][0x200];
  //   u8 bufferB[MAX_BATTLERS_COUNT][0x200];
 };
@@ -642,7 +636,7 @@ struct BattleStruct
 	u8 linkBattleVsSpriteId_V;
 	u8 linkBattleVsSpriteId_S;
 	u8 castformToChangeInto;
-	u8 chosenMovePositions[BATTLE_BANKS_COUNT];
+	u8 chosenMovePositions[BATTLE_BANKS_COUNT]; //0x2000090
 	u8 stateIdAfterSelScript[BATTLE_BANKS_COUNT];
 	u8 field_88;
 	u8 field_89;
@@ -678,9 +672,9 @@ struct BattleStruct
 	u8 overworldWeatherDone;
 	u8 atkCancellerTracker;
 	u16 usedHeldItems[MAX_BATTLERS_COUNT];
-	u8 chosenItem[MAX_BATTLERS_COUNT]; //Why is this a u8?
-	u8 AI_itemType[2];
-	u8 AI_itemFlags[2];
+	u16 chosenItem[MAX_BATTLERS_COUNT / 2]; //Why is this a u8?
+	u8 AI_itemType[MAX_BATTLERS_COUNT / 2];
+	u8 AI_itemFlags[MAX_BATTLERS_COUNT / 2];
 	u16 choicedMove[MAX_BATTLERS_COUNT];
 	u16 changedItems[MAX_BATTLERS_COUNT];
 	u8 intimidateBank;
@@ -727,18 +721,20 @@ struct NewBattleStruct
 	u8 LuckyChantTimers[NUM_BATTLE_SIDES];
 	u8 TailwindTimers[NUM_BATTLE_SIDES];
 	u8 AuroraVeilTimers[NUM_BATTLE_SIDES];
+	u8 maxVineLashTimers[NUM_BATTLE_SIDES];
 	u8 maxWildfireTimers[NUM_BATTLE_SIDES];
+	u8 maxCannonadeTimers[NUM_BATTLE_SIDES];
 	u8 maxVolcalithTimers[NUM_BATTLE_SIDES];
 
 	//Personal Counters
 	u8 TelekinesisTimers[MAX_BATTLERS_COUNT];
 	u8 MagnetRiseTimers[MAX_BATTLERS_COUNT];
-	u8 HealBlockTimers[MAX_BATTLERS_COUNT]; 			//0x20179D7
+	u8 HealBlockTimers[MAX_BATTLERS_COUNT];
 	u8 LaserFocusTimers[MAX_BATTLERS_COUNT];
 	u8 ThroatChopTimers[MAX_BATTLERS_COUNT];
 	u8 EmbargoTimers[MAX_BATTLERS_COUNT];
 	u8 ElectrifyTimers[MAX_BATTLERS_COUNT];
-	u8 SlowStartTimers[MAX_BATTLERS_COUNT];				//0x20175E8
+	u8 SlowStartTimers[MAX_BATTLERS_COUNT];
 	u8 StakeoutCounters[MAX_BATTLERS_COUNT];
 	u8 StompingTantrumTimers[MAX_BATTLERS_COUNT];
 	u8 NimbleCounters[MAX_BATTLERS_COUNT];
@@ -754,7 +750,7 @@ struct NewBattleStruct
 	u8 neutralizingGasBlockedAbilities[MAX_BATTLERS_COUNT];
 	u8 skyDropAttackersTarget[MAX_BATTLERS_COUNT]; //skyDropAttackersTarget[gBankAttacker] = gBankTarget
 	u8 skyDropTargetsAttacker[MAX_BATTLERS_COUNT]; //skyDropTargetsAttacker[gBankTarget] = gBankAttacker
-	u8 pickupStack[MAX_BATTLERS_COUNT]; //0x2017620
+	u8 pickupStack[MAX_BATTLERS_COUNT];
 	u8 synchronizeTarget[MAX_BATTLERS_COUNT]; //Bank + 1 that statused given bank
 	u8 leftoverHealingDone[MAX_BATTLERS_COUNT]; //Leftovers already restored health this turn or Sticky Barb did damage
 	u8 statRoseThisRound[MAX_BATTLERS_COUNT];
@@ -762,6 +758,7 @@ struct NewBattleStruct
 	u8 statFellThisRound[MAX_BATTLERS_COUNT];
 	u8 recalculatedBestDoublesKillingScores[MAX_BATTLERS_COUNT];
 	s8 lastBracketCalc[MAX_BATTLERS_COUNT];
+	u8 chiStrikeCritBoosts[MAX_BATTLERS_COUNT]; //~0x2017A4B
 	u8 sandblastCentiferno[MAX_BATTLERS_COUNT]; //Records if any banks are trapped by G-Max Centiferno or G-Max Sandblast
 	u8 disguisedAs[MAX_BATTLERS_COUNT]; //The party index + 1 the mon with Illusion is disguised as
 
@@ -814,7 +811,7 @@ struct NewBattleStruct
 	u8 switchOutBankLooper;
 	u8 skipBankStatAnim;
 	u8 maxGoldrushUses;
-	u8 playerItemUsedCount;
+	u8 playerItemUsedCount; //~0x2017A82
 	u8 originalAttackerBackup : 2;
 	u8 originalTargetBackup : 2;
 
@@ -861,6 +858,8 @@ struct NewBattleStruct
 	bool8 calculatedSpreadMoveAccuracy : 1;  //After the accuracy has been calculated for all Pokemon hit by a spread move
 	bool8 breakDisguiseSpecialDmg : 1;
 	bool8 handlingFaintSwitching : 1;
+	bool8 doingPluckItemEffect : 1;
+	bool8 usedXSpDef : 1; //Needed because it's hooked into the X Sp. Atk
 
 	//Other
 	u16 LastUsedMove;
@@ -876,7 +875,8 @@ struct NewBattleStruct
 	u16 failedThrownPokeBall;
 	u32 maxGoldrushMoney;
 	u16 itemBackup[PARTY_SIZE];
-	
+	u8 hiddenHealthboxFlags[MAX_SPRITES / 8]; //~2017AD0
+
 	//Things for Spread Moves
 	s32 DamageTaken[MAX_BATTLERS_COUNT]; //~0x2017AC0
 	s32 turnDamageTaken[MAX_BATTLERS_COUNT]; //Specifically for multi-hit moves and Emergency Exit
@@ -943,6 +943,8 @@ struct NewBattleStruct
 	struct 
 	{
 		u16 zMoveHelper;
+		bool8 sideSwitchedThisRound;
+		u8 switchingCooldown[MAX_BATTLERS_COUNT]; //~0x2017B5B
 		u8 itemEffects[MAX_BATTLERS_COUNT];
 		u16 movePredictions[MAX_BATTLERS_COUNT][MAX_BATTLERS_COUNT]; //movePredictions[bankAtk][bankDef]
 		u16 strongestMove[MAX_BATTLERS_COUNT][MAX_BATTLERS_COUNT]; //strongestMove[bankAtk][bankDef]
@@ -1113,13 +1115,13 @@ struct FlingStruct
 #define B_ANIM_SNATCH_MOVE              0x11
 #define B_ANIM_FUTURE_SIGHT_HIT         0x12
 #define B_ANIM_DOOM_DESIRE_HIT          0x13
-#define B_ANIM_x14                      0x14
+#define B_ANIM_FOCUS_PUNCH_SET_UP       0x14
 #define B_ANIM_INGRAIN_HEAL             0x15
 #define B_ANIM_WISH_HEAL                0x16
 
-#define B_ANIM_ASTONISH_DROPS 0x17
-#define B_ANIM_SCARY_FACE_ASTONISH 0x18
-#define B_ANIM_TRANSFORM_FRONT 0x19
+#define B_ANIM_MON_SCARED 0x17
+#define B_ANIM_GHOST_GET_OUT 0x18
+#define B_ANIM_SILPH_SCOPED 0x19
 #define B_ANIM_TURN_INTO_ROCK 0x1A
 #define B_ANIM_WAITING_WAGGLE 0x1B
 #define B_ANIM_LEVEL_UP_SHINE 0x1C
@@ -1167,8 +1169,10 @@ struct FlingStruct
 #define B_ANIM_DYNAMAX_ENERGY_SWIRL 0x46
 #define B_ANIM_RAID_BATTLE_STORM 0x47
 #define B_ANIM_RAID_BATTLE_ENERGY_BURST 0x48
-#define B_ANIM_G_MAX_WILDFIRE 0x49
-#define B_ANIM_G_MAX_VOLCALITH 0x4A
+#define B_ANIM_G_MAX_VINE_LASH 0x49
+#define B_ANIM_G_MAX_WILDFIRE 0x4A
+#define B_ANIM_G_MAX_CANNONADE 0x4B
+#define B_ANIM_G_MAX_VOLCALITH 0x4C
 
 #define B_ANIM_TRANSFORM_MOVE 0xFF
 

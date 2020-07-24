@@ -2,6 +2,8 @@
 #include "defines_battle.h"
 #include "../include/event_data.h"
 #include "../include/field_weather.h"
+#include "../include/item_menu.h"
+#include "../include/item_use.h"
 #include "../include/malloc.h"
 #include "../include/random.h"
 #include "../include/constants/songs.h"
@@ -49,6 +51,9 @@ const u16 gEndBattleFlagClearTable[] =
 #ifdef FLAG_SMART_WILD
 	FLAG_SMART_WILD,
 #endif
+#ifdef FLAG_SCALE_WILD_BOSS_LEVEL
+	FLAG_SCALE_WILD_BOSS_LEVEL,
+#endif
 #ifdef FLAG_DOUBLE_WILD_BATTLE
 	FLAG_DOUBLE_WILD_BATTLE,
 #endif
@@ -73,9 +78,15 @@ const u16 gEndBattleFlagClearTable[] =
 #ifdef FLAG_KEEP_CONSUMABLE_ITEMS
 	FLAG_KEEP_CONSUMABLE_ITEMS,
 #endif
+#ifdef FLAG_HIDDEN_ABILITY
+	FLAG_HIDDEN_ABILITY,
+#endif
+#ifdef FLAG_GIGANTAMAXABLE
+	FLAG_GIGANTAMAXABLE,
+#endif
+
 	FLAG_TAG_BATTLE,
 	FLAG_TWO_OPPONENTS,
-	FLAG_HIDDEN_ABILITY,
 };
 
 //This file's functions:
@@ -305,6 +316,22 @@ bool8 HandleRunActionFrontier(void)
 
 #define ABILITY_PREVENTING_ESCAPE 2
 
+bool8 AreAllKindsOfRunningPrevented(void)
+{
+	if (IsRaidBattle() && !RAID_BATTLE_END)
+		return TRUE;
+	#ifdef FLAG_NO_RUNNING
+	else if (FlagGet(FLAG_NO_RUNNING))
+		return TRUE;
+	#endif
+	#ifdef FLAG_NO_CATCHING_AND_RUNNING
+	else if (FlagGet(FLAG_NO_CATCHING_AND_RUNNING))
+		return TRUE;
+	#endif
+
+	return FALSE;
+}
+
 u8 IsRunningFromBattleImpossible(void)
 {
 	u8 itemEffect;
@@ -316,15 +343,7 @@ u8 IsRunningFromBattleImpossible(void)
 
 	if (gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_FRONTIER))
 		return FALSE;
-	#ifdef FLAG_NO_RUNNING
-	else if (FlagGet(FLAG_NO_RUNNING))
-		return TRUE;
-	#endif
-	#ifdef FLAG_NO_CATCHING_AND_RUNNING
-	else if (FlagGet(FLAG_NO_CATCHING_AND_RUNNING))
-		return TRUE;
-	#endif
-	else if (IsRaidBattle() && !RAID_BATTLE_END)
+	else if (AreAllKindsOfRunningPrevented())
 		return TRUE;
 	else if (itemEffect == ITEM_EFFECT_CAN_ALWAYS_RUN)
 		return FALSE;
@@ -409,21 +428,7 @@ bool8 TryRunFromBattle(u8 bank)
 	itemEffect = ITEM_EFFECT(bank);
 	gStringBank = bank;
 
-	#ifdef FLAG_NO_RUNNING
-	if (FlagGet(FLAG_NO_RUNNING))
-	{
-		return FALSE;
-	}
-	else
-	#endif
-	#ifdef FLAG_NO_CATCHING_AND_RUNNING
-	if (FlagGet(FLAG_NO_CATCHING_AND_RUNNING))
-	{
-		return FALSE;
-	}
-	else
-	#endif
-	if (IsRaidBattle() && !RAID_BATTLE_END)
+	if (AreAllKindsOfRunningPrevented())
 	{
 		return FALSE;
 	}
@@ -503,6 +508,18 @@ bool8 TryRunFromBattle(u8 bank)
 	return effect;
 }
 
+void BattleUseFunc_PokeDoll(u8 taskId)
+{
+	if (!(gBattleTypeFlags & BATTLE_TYPE_TRAINER)
+	&& !AreAllKindsOfRunningPrevented())
+	{
+		RemoveUsedItem();
+		DisplayItemMessageInBag(taskId, 2, gStringVar4, ItemMenu_StartFadeToExitCallback);
+	}
+	else
+		PrintNotTheTimeToUseThat(taskId, 0);
+}
+
 void EndOfBattleThings(void)
 {
 	if (gNewBS != NULL) //Hasn't been cleared yet
@@ -512,6 +529,7 @@ void EndOfBattleThings(void)
 		RevertDynamax();
 		FormsRevert(gPlayerParty);
 		MegaRevert(gPlayerParty);
+		GigantamaxRevert(gPlayerParty);
 		UpdateBurmy();
 		EndPartnerBattlePartyRestore();
 		EndSkyBattlePartyRestore();

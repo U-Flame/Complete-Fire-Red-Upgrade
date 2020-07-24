@@ -35,7 +35,7 @@
 .equ BG_SEISMICTOSS_SKUUPPERCUT, 0x11
 .equ BG_FLYING_BATTLE, 0x12
 .equ BG_FLYING_CONTESTS, 0x13
-.equ BG_AURORABEAM, 0x14
+.equ BG_AURORA_BEAM, 0x14
 .equ BG_FISSURE, 0x15
 .equ BG_BUG_ON_OPPONENT, 0x16
 .equ BG_BUG_ON_PLAYER, 0x17
@@ -227,7 +227,7 @@
 .word \choosetwoturnanim2
 .endm
 
-.macro jumpifmoveturnEQ jumpifmoveturnEQturn jumpifmoveturnEQPTR
+.macro jumpifmoveturn jumpifmoveturnEQturn jumpifmoveturnEQPTR
 .byte 0x12
 .byte \jumpifmoveturnEQturn
 .word \jumpifmoveturnEQPTR
@@ -446,6 +446,7 @@
 .equ AnimTask_SlideOffScreen, 0x80995fd
 .equ AnimTask_Rollout, 0x80b4bd1
 .equ AnimTask_ShakeTargetBasedOnMovePowerOrDmg, 0x8099bd5
+.equ AnimTask_TranslateMonElliptical, 0x8098f85
 .equ AnimTask_TranslateMonEllipticalRespectSide, 0x809907D
 .equ AnimTask_AttackerFadeToInvisible, 0x80B78E1
 .equ AnimTask_StretchTargetUp, 0x80A9A21
@@ -454,9 +455,12 @@
 .equ AnimTask_AnimateGustTornadoPalette, 0x80b194d
 .equ AnimTask_DragonDanceWaver, 0x80b75e1
 .equ AnimTask_BlendPalInAndOutByTag, 0x8076289
+.equ AnimTask_BlendMonInAndOut, 0x807616D
 .equ AnimTask_UproarDistortion, 0x80AA7C9
 .equ AnimTask_FlailMovement, 0x80E0851
 .equ AnimTask_TraceMonBlended, 0x80bab99
+.equ AnimTask_SmokescreenImpact, 0x80de34d
+.equ AnimTask_AttackerPunchWithTrace, 0x8077031
 
 @launchtemplate
 
@@ -512,6 +516,11 @@
 .equ Template_DragonBreathFire, 0x83e77a4
 .equ Template_SweetScentPetal, 0x83FF324
 .equ Template_CentredSparklingStars, 0x83E340C
+.equ Template_SpiderWeb, 0x83e72dc
+.equ Template_TearDrop, 0x83e7998
+.equ Template_ShakeMonOrTerrain, 0x83e7b88
+.equ Template_FallingRock, 0x83e73b4
+.equ Template_BlackSmoke, 0x83fee18
 
 .equ SpriteCB_AnimSpriteOnMonPos, 0x8075D9D
 .equ Callback_TranslateAnimSpriteToTargetMonLocation, 0x8075DF5
@@ -616,6 +625,8 @@
 .equ FIRE_SPIN_TRAP_PARTICLES, 0x81C885F
 .equ CREATE_COTTON_SPORES, 0x81D03B5
 .equ HEALING_ANIM_TARGET, 0x81D5712
+.equ SAND_ATTACK_DIRT, 0x81cdf72
+.equ EMBER_FIRE_HIT, 0x81c7cd5
 
 @supercommands
 

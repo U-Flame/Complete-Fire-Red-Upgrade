@@ -139,8 +139,14 @@ extern bool8 CanMonParticipateInASkyBattle(struct Pokemon* mon);
 
 //This file's functions:
 static u8 CreateNPCTrainerParty(struct Pokemon* const party, const u16 trainerNum, const bool8 firstTrainer, const bool8 side);
-static bool8 IsScaledTrainerBattleMode();
-static void ModifySpeciesAndLevelForRematchBattle(u16* species, u8* level, u8 minPartyLevel);
+#if (defined SCALED_TRAINERS && !defined  DEBUG_NO_LEVEL_SCALING)
+static u8 GetPlayerBiasedAverageLevel(u8 maxLevel);
+static bool8 CanTrainerEvolveMon(void);
+static bool8 IsPseudoBossTrainerPartyForLevelScaling(u8 trainerPartyFlags);
+#endif
+static bool8 IsBossTrainerClassForLevelScaling(u16 trainerId);
+static void ModifySpeciesAndLevelForGenericBattle(u16* species, u8* level, u8 minEnemyTeamLevel, u8 averagePlayerTeamLevel, u8 trainerClass, bool8 shouldEvolve);
+static void ModifySpeciesAndLevelForBossBattle(unusedArg u16* species, unusedArg u8* level, unusedArg u8 maxEnemyTeamLevel, unusedArg u8 maxPlayerTeamLevel, unusedArg bool8 shouldEvolve);
 static u8 BuildFrontierParty(struct Pokemon* const party, const u16 trainerNum, const u8 tier, const bool8 firstTrainer, const bool8 forPlayer, const u8 side);
 static void BuildFrontierMultiParty(u8 multiId);
 static void BuildRaidMultiParty(void);
@@ -523,43 +529,50 @@ void sp06B_ReplacePlayerTeamWithMultiTrainerTeam(void)
 //Returns the number of Pokemon
 static u8 CreateNPCTrainerParty(struct Pokemon* const party, const u16 trainerId, const bool8 firstTrainer, const bool8 side)
 {
-	u32 i, j;
-	u8 baseIV;
-	u32 nameHash = 0;
-	u8 monsCount = 1;
-	u32 otid = Random32();
-	u8 setMonGender = 0xFF;
+	u32 i, j, nameHash;
+	u8 monsCount, baseIV, setMonGender, trainerNameLengthOddness, minPartyLevel, maxPartyLevel, modifiedAveragePlayerLevel, highestPlayerLevel, canEvolveMon, levelScaling;
+	struct Trainer* trainer;
+	u32 otid = 0;
+	u8 otIdType = OT_ID_RANDOM_NO_SHINY;
 
 	if (trainerId == TRAINER_SECRET_BASE)
 		return 0;
 	else if (IsFrontierTrainerId(trainerId))
 		return BuildFrontierParty(party, trainerId, BATTLE_FACILITY_STANDARD, firstTrainer, FALSE, side);
 
-	struct Trainer* trainer = &gTrainers[trainerId];
-
-	#ifdef VAR_GAME_DIFFICULTY
-	if (VarGet(VAR_GAME_DIFFICULTY) >= OPTIONS_EXPERT_DIFFICULTY)
-		baseIV = 31;
-	else
-	#endif
-	{
-		baseIV = MathMin(gBaseIVsByTrainerClass[trainer->trainerClass], 31);
-		if (baseIV == 0) //No data in the table
-			baseIV = STANDARD_IV;
-	}
-
-	if (!firstTrainer && side == B_SIDE_PLAYER && trainer->encounterMusic > 0) //Multi partner with preset Id
-	{
-		otid = gFrontierMultiBattleTrainers[trainer->encounterMusic - 1].otId;
-		setMonGender = trainer->gender; //So all Pokemon have the same gender every time
-	}
-
+	//Check if can build team
 	if (((gBattleTypeFlags & (BATTLE_TYPE_TRAINER | BATTLE_TYPE_EREADER_TRAINER | BATTLE_TYPE_TRAINER_TOWER)) == BATTLE_TYPE_TRAINER)
 	||   (gBattleTypeFlags & BATTLE_TYPE_INGAME_PARTNER))
 	{
-		if (firstTrainer)
+		if (firstTrainer && side == B_SIDE_OPPONENT)
 			ZeroEnemyPartyMons();
 
+		//Set up necessary data
+		trainer = &gTrainers[trainerId];
+
+		//Choose Trainer IVs
+		#ifdef VAR_GAME_DIFFICULTY
+		u8 gameDifficulty = VarGet(VAR_GAME_DIFFICULTY);
+		if (gameDifficulty >= OPTIONS_EXPERT_DIFFICULTY)
+			baseIV = 31;
+		else
+		#endif
+		{
+			baseIV = MathMin(gBaseIVsByTrainerClass[trainer->trainerClass], 31);
+			if (baseIV == 0) //No data in the table
+				baseIV = STANDARD_IV;
+		}
+
+		//Choose Trainer Pokemon genders
+		setMonGender = 0xFF; //Randomly assign gender based on hash
+		if (!firstTrainer && side == B_SIDE_PLAYER && trainer->encounterMusic > 0) //Multi partner with preset Id
+		{
+			otid = gFrontierMultiBattleTrainers[trainer->encounterMusic - 1].otId;
+			otIdType = OT_ID_PRESET;
+			setMonGender = trainer->gender; //So all Pokemon have the same gender every time
+		}
+
+		//Get party size
 		if (gBattleTypeFlags & BATTLE_TYPE_TWO_OPPONENTS && side == B_SIDE_OPPONENT)
 		{
 			#ifdef OPEN_WORLD_TRAINERS
@@ -602,32 +615,55 @@ static u8 CreateNPCTrainerParty(struct Pokemon* const party, const u16 trainerId
 			#endif
 				monsCount = trainer->partySize;
 		}
-
-		u8 trainerNameLengthOddness = StringLength(trainer->trainerName) & 1;
-		u8 minPartyLevel = MAX_LEVEL;
-		bool8 scaledTrainerBattleMode = IsScaledTrainerBattleMode();
-		if (side == B_SIDE_OPPONENT && scaledTrainerBattleMode)
+		
+		//Get details for level scaling
+		#if (defined SCALED_TRAINERS && !defined  DEBUG_NO_LEVEL_SCALING)
+		#ifdef VAR_GAME_DIFFICUTY
+		levelScaling = gameDifficulty != OPTIONS_EASY_DIFFICULTY; //Don't scale Trainers on easy mode
+		#else
+		levelScaling = TRUE;
+		#endif
+		
+		minPartyLevel = MAX_LEVEL;
+		maxPartyLevel = 0;
+		highestPlayerLevel = GetHighestMonLevel(gPlayerParty);
+		modifiedAveragePlayerLevel = GetPlayerBiasedAverageLevel(highestPlayerLevel);
+		canEvolveMon = CanTrainerEvolveMon();
+		if (side == B_SIDE_OPPONENT || !firstTrainer) //Only worth calculating if the Trainer is the enemy or the partner
 		{
 			for (i = 0; i < monsCount; ++i)
 			{
-				switch (gTrainers[trainerId].partyFlags) {
+				switch (trainer->partyFlags) {
 					case 0:
 						minPartyLevel = (trainer->party.NoItemDefaultMoves[i].lvl < minPartyLevel) ? trainer->party.NoItemDefaultMoves[i].lvl : minPartyLevel;
+						maxPartyLevel = (trainer->party.NoItemDefaultMoves[i].lvl > maxPartyLevel) ? trainer->party.NoItemDefaultMoves[i].lvl : maxPartyLevel;
 						break;
 					case PARTY_FLAG_CUSTOM_MOVES:
 						minPartyLevel = (trainer->party.NoItemCustomMoves[i].lvl < minPartyLevel) ? trainer->party.NoItemCustomMoves[i].lvl : minPartyLevel;
+						maxPartyLevel = (trainer->party.NoItemCustomMoves[i].lvl > maxPartyLevel) ? trainer->party.NoItemCustomMoves[i].lvl : maxPartyLevel;
 						break;
 					case PARTY_FLAG_HAS_ITEM:
 						minPartyLevel = (trainer->party.ItemDefaultMoves[i].lvl < minPartyLevel) ? trainer->party.ItemDefaultMoves[i].lvl : minPartyLevel;
+						maxPartyLevel = (trainer->party.ItemDefaultMoves[i].lvl > maxPartyLevel) ? trainer->party.ItemDefaultMoves[i].lvl : maxPartyLevel;
 						break;
 					case PARTY_FLAG_CUSTOM_MOVES | PARTY_FLAG_HAS_ITEM:
 						minPartyLevel = (trainer->party.ItemCustomMoves[i].lvl < minPartyLevel) ? trainer->party.ItemCustomMoves[i].lvl : minPartyLevel;
+						maxPartyLevel = (trainer->party.ItemCustomMoves[i].lvl > maxPartyLevel) ? trainer->party.ItemCustomMoves[i].lvl : maxPartyLevel;
 						break;
 				}
 			}
 		}
+		#else //No level scaling
+		levelScaling = FALSE;
+		minPartyLevel = MAX_LEVEL;
+		maxPartyLevel = 0;
+		modifiedAveragePlayerLevel = 0;
+		highestPlayerLevel = 0;
+		canEvolveMon = FALSE;
+		#endif
 
-		for (i = 0; i < monsCount; ++i)
+		//Create each Pokemon
+		for (i = 0, trainerNameLengthOddness = StringLength(trainer->trainerName) & 1, nameHash = 0; i < monsCount; ++i)
 		{
 			u32 personalityValue;
 			u8 genderOffset = 0x80;
@@ -676,12 +712,12 @@ static u8 CreateNPCTrainerParty(struct Pokemon* const party, const u16 trainerId
 				if (FlagGet(FLAG_SCALE_TRAINER_LEVELS) || (gBattleTypeFlags & BATTLE_TYPE_TRAINER_TOWER))
 					openWorldLevel = GetHighestMonLevel(gPlayerParty);
 
-				CreateMon(&party[i], speciesToCreate, openWorldLevel, STANDARD_IV, TRUE, personalityValue, OT_ID_PRESET, otid);
+				CreateMon(&party[i], speciesToCreate, openWorldLevel, STANDARD_IV, TRUE, personalityValue, otIdType, otid);
 			}
 			else
 			#endif
 			{
-				switch (gTrainers[trainerId].partyFlags) {
+				switch (trainer->partyFlags) {
 					case 0:
 						MAKE_POKEMON(trainer->party.NoItemDefaultMoves);
 						break;
@@ -704,74 +740,79 @@ static u8 CreateNPCTrainerParty(struct Pokemon* const party, const u16 trainerId
 				}
 			}
 
+			//Assign Trainer information to mon
 			u8 otGender = trainer->gender;
-			SetMonData(&party[i], REQ_OTGENDER, &otGender);
-			SetMonData(&party[i], REQ_OTNAME, &trainer->trainerName);
-			party[i].metLocation = gCurrentMapName;
-			party[i].obedient = 1;
+			const u8* name = TryGetRivalNameByTrainerClass(gTrainers[trainerId].trainerClass);
+			if (name == NULL) //Not Rival or Rival name isn't tied to Trainer class
+				SetMonData(&party[i], MON_DATA_OT_NAME, &trainer->trainerName);
+			else
+				SetMonData(&party[i], MON_DATA_OT_NAME, name);
+			SetMonData(&party[i], MON_DATA_OT_GENDER, &otGender);
 
+			//Give custom Poke Ball
 			#ifdef TRAINER_CLASS_POKE_BALLS
-				SetMonData(&party[i], REQ_POKEBALL, &gClassPokeBalls[trainer->trainerClass]);
+			SetMonData(&party[i], MON_DATA_POKEBALL, &gClassPokeBalls[trainer->trainerClass]);
 			#endif
 
+			//Give EVs
 			#ifdef TRAINERS_WITH_EVS
-				u8 spreadNum = trainer->party.NoItemCustomMoves[i].iv;
-				if (gTrainers[trainerId].partyFlags == (PARTY_FLAG_CUSTOM_MOVES | PARTY_FLAG_HAS_ITEM)
-				&& trainer->aiFlags > 1
-				#ifdef VAR_GAME_DIFFICULTY
-				&& VarGet(VAR_GAME_DIFFICULTY) != OPTIONS_EASY_DIFFICULTY
-				#endif
-				&& spreadNum != 0
-				&& spreadNum < ARRAY_COUNT(gTrainersWithEvsSpreads))
-				{
-					const struct TrainersWithEvs* spread = &gTrainersWithEvsSpreads[spreadNum];
+			u8 spreadNum = trainer->party.NoItemCustomMoves[i].iv;
+			if (gTrainers[trainerId].partyFlags == (PARTY_FLAG_CUSTOM_MOVES | PARTY_FLAG_HAS_ITEM)
+			&& trainer->aiFlags > 1
+			#ifdef VAR_GAME_DIFFICULTY
+			&& gameDifficulty != OPTIONS_EASY_DIFFICULTY
+			#endif
+			&& spreadNum != 0
+			&& spreadNum < NELEMS(gTrainersWithEvsSpreads)) //Valid id
+			{
+				const struct TrainersWithEvs* spread = &gTrainersWithEvsSpreads[spreadNum];
 
-					SET_EVS(spread);
-					SET_IVS_SINGLE_VALUE(MathMin(31, spread->ivs));
+				SET_EVS(spread);
+				SET_IVS_SINGLE_VALUE(MathMin(31, spread->ivs));
 
-					u8 ballType;
-					switch(spread->ball) {
-						case TRAINER_EV_CLASS_BALL:
-						#ifdef TRAINER_CLASS_POKE_BALLS
-							ballType = gClassPokeBalls[trainer->trainerClass];
-						#else
-							ballType = BALL_TYPE_POKE_BALL;
-						#endif
-							break;
-						case TRAINER_EV_RANDOM_BALL:
-							ballType = Random() % NUM_BALLS; //Set Random Ball
-							break;
-						default:
-							ballType = MathMin(LAST_BALL_INDEX, spread->ball);
-					}
-
-					SetMonData(&party[i], REQ_POKEBALL, &ballType);
-
-					switch(spread->ability) {
-						case Ability_Hidden:
-						TRAINER_WITH_EV_GIVE_HIDDEN_ABILITY:
-							GiveMonNatureAndAbility(&party[i], spread->nature, 0xFF, FALSE, TRUE, FALSE); //Give Hidden Ability
-							break;
-						case Ability_1:
-						case Ability_2:
-							GiveMonNatureAndAbility(&party[i], spread->nature, MathMin(1, spread->ability - 1), FALSE, TRUE, FALSE);
-							break;
-						case Ability_Random_1_2:
-						TRAINER_WITH_EV_GIVE_RANDOM_ABILITY:
-							GiveMonNatureAndAbility(&party[i], spread->nature, Random() % 2, FALSE, TRUE, FALSE);
-							break;
-						case Ability_RandomAll: ;
-							u8 random = Random() % 3;
-
-							if (random == 2)
-								goto TRAINER_WITH_EV_GIVE_HIDDEN_ABILITY;
-							else
-								goto TRAINER_WITH_EV_GIVE_RANDOM_ABILITY;
-							break;
-					}
+				u8 ballType;
+				switch(spread->ball) {
+					case TRAINER_EV_CLASS_BALL:
+					#ifdef TRAINER_CLASS_POKE_BALLS
+						ballType = gClassPokeBalls[trainer->trainerClass];
+					#else
+						ballType = BALL_TYPE_POKE_BALL;
+					#endif
+						break;
+					case TRAINER_EV_RANDOM_BALL:
+						ballType = Random() % NUM_BALLS; //Set Random Ball
+						break;
+					default:
+						ballType = MathMin(spread->ball, LAST_BALL_INDEX);
 				}
+
+				SetMonData(&party[i], MON_DATA_POKEBALL, &ballType);
+
+				switch(spread->ability) {
+					case Ability_Hidden:
+					TRAINER_WITH_EV_GIVE_HIDDEN_ABILITY:
+						GiveMonNatureAndAbility(&party[i], spread->nature, 0xFF, FALSE, TRUE, FALSE); //Give Hidden Ability
+						break;
+					case Ability_1:
+					case Ability_2:
+						GiveMonNatureAndAbility(&party[i], spread->nature, MathMin(1, spread->ability - 1), FALSE, TRUE, FALSE);
+						break;
+					case Ability_Random_1_2:
+					TRAINER_WITH_EV_GIVE_RANDOM_ABILITY:
+						GiveMonNatureAndAbility(&party[i], spread->nature, Random() % 2, FALSE, TRUE, FALSE);
+						break;
+					case Ability_RandomAll: ;
+						u8 random = Random() % 3;
+
+						if (random == 2)
+							goto TRAINER_WITH_EV_GIVE_HIDDEN_ABILITY;
+
+						goto TRAINER_WITH_EV_GIVE_RANDOM_ABILITY;
+				}
+			}
 			#endif
 
+			//Caluate stats and set to full health
 			CalculateMonStatsNew(&party[i]);
 			HealMon(&party[i]);
 
@@ -779,26 +820,77 @@ static u8 CreateNPCTrainerParty(struct Pokemon* const party, const u16 trainerId
 			TryStatusInducer(&party[i]);
 			gBankTarget = i + 1;
 		}
-		#ifdef OPEN_WORLD_TRAINERS
-		if ((GetOpenWorldTrainerMonAmount() > 1 || trainer->doubleBattle)
-		#else
-		if (trainer->partySize > 1
+
+		//Set Double battle type if necessary
+		if (trainer->doubleBattle
+		#ifdef FLAG_DOUBLE_BATTLE
+		|| FlagGet(FLAG_DOUBLE_BATTLE)
 		#endif
-		&& ViableMonCount(gPlayerParty) >= 2) //Double battles will not happen if the player only has 1 mon that can fight or if the foe only has 1 poke
+		)
 		{
-			gBattleTypeFlags |= trainer->doubleBattle;
-
-			#ifdef FLAG_DOUBLE_BATTLE
-				if (FlagGet(FLAG_DOUBLE_BATTLE))
-					gBattleTypeFlags |= BATTLE_TYPE_DOUBLE;
+			#ifdef OPEN_WORLD_TRAINERS
+			if ((GetOpenWorldTrainerMonAmount() > 1 || trainer->doubleBattle)
+			#else
+			if (trainer->partySize > 1
 			#endif
+			&& ViableMonCount(gPlayerParty) >= 2) //Double battles will not happen if the player only has 1 mon that can fight or if the foe only has 1 mon
+			{
+				gBattleTypeFlags |= BATTLE_TYPE_DOUBLE;
+			}
 		}
-
 	}
+	else
+		monsCount = 1;
+
 	return monsCount;
 }
 
-static bool8 IsScaledTrainerBattleMode()
+//These next few functions are related to scaling a Trainer's team dynamically based the player's strength
+#if (defined SCALED_TRAINERS && !defined DEBUG_NO_LEVEL_SCALING)
+struct LevelScaler
+{
+	u8 minLevel;
+	u8 startScalingAtLevel;
+};
+
+static const struct LevelScaler sLevelScales[] =
+{
+	[0] = {0, 19},
+	[1] = {15, 26},
+	[2] = {20, 32},
+	[3] = {25, 36},
+	[4] = {30, 45},
+	[5] = {38, 54},
+	[6] = {48, 58},
+	[7] = {55, 65},
+	[8] = {60, 70},
+	[9] = {70,  0},
+};
+
+static u8 GetPlayerBiasedAverageLevel(u8 maxLevel)
+{
+	u32 i, sum, count;
+	
+	for (i = 0, sum = 0, count = 0; i < PARTY_SIZE; ++i)
+	{
+		u16 species = GetMonData(&gPlayerParty[i], MON_DATA_SPECIES2, NULL);
+	
+		if (species != SPECIES_NONE && species != SPECIES_EGG) //Viable mon
+		{
+			u8 level = GetMonData(&gPlayerParty[i], MON_DATA_LEVEL, NULL);
+			
+			if (maxLevel - level < 5) //This level is within 5 levels of the max
+			{
+				sum += level;
+				++count;
+			}
+		}
+	}
+
+	return sum / count;
+}
+
+static bool8 CanTrainerEvolveMon(void)
 {
 	return sTrainerBattleMode == TRAINER_BATTLE_SINGLE_SCALED
 		|| sTrainerBattleMode == TRAINER_BATTLE_DOUBLE_SCALED
@@ -806,55 +898,126 @@ static bool8 IsScaledTrainerBattleMode()
 		#ifdef UNBOUND
 		|| sTrainerBattleMode == TRAINER_BATTLE_REMATCH
 		|| sTrainerBattleMode == TRAINER_BATTLE_REMATCH_DOUBLE
+		|| sTrainerBattleMode == TRAINER_BATTLE_REMATCH_TWO_OPPONENTS
 		#endif
 		;
 }
 
-static void ModifySpeciesAndLevelForRematchBattle(u16* species, u8* level, u8 minPartyLevel)
+static bool8 IsPseudoBossTrainerPartyForLevelScaling(u8 trainerPartyFlags)
 {
-	u8 minLevel, levelRange, newLevel;
-
-	switch (GetOpenWorldBadgeCount()) {
-		case 0:
-			minLevel = 10;
-			break;
-		case 1:
-			minLevel = 15;
-			break;
-		case 2:
-			minLevel = 20;
-			break;
-		case 3:
-			minLevel = 25;
-			break;
-		case 4:
-			minLevel = 30;
-			break;
-		case 5:
-			minLevel = 40;
-			break;
-		case 6:
-			minLevel = 50;
-			break;
-		case 7:
-			minLevel = 55;
-			break;
-		case 8:
-			minLevel = 60;
-			break;
-		default: //Beat Game
-			minLevel = 70;
-			break;
+	//If the Trainer has custom moves, then they must be important
+	switch (trainerPartyFlags) {
+		case PARTY_FLAG_CUSTOM_MOVES:
+		case PARTY_FLAG_CUSTOM_MOVES | PARTY_FLAG_HAS_ITEM:
+			return TRUE;
 	}
 
-	levelRange = *level - minPartyLevel;
-	newLevel = minLevel + levelRange;
+	return FALSE;
+}
 
-	if (newLevel > *level)
+#endif
+
+static bool8 IsBossTrainerClassForLevelScaling(u16 trainerId)
+{
+	switch (gTrainers[trainerId].trainerClass) {
+		case CLASS_LEADER:
+		case CLASS_ELITE_4:
+		case CLASS_CHAMPION:
+		case CLASS_BOSS:
+		#ifdef UNBOUND
+		case CLASS_LOR_LEADER:
+		#endif
+			return TRUE;
+	}
+	
+	return FALSE;
+}
+
+static void ModifySpeciesAndLevelForGenericBattle(unusedArg u16* species, unusedArg u8* level, unusedArg u8 minEnemyTeamLevel, unusedArg u8 averagePlayerTeamLevel, unusedArg u8 trainerPartyFlags, unusedArg bool8 shouldEvolve)
+{
+	#if (defined SCALED_TRAINERS && !defined  DEBUG_NO_LEVEL_SCALING)
+	u8 minEnemyLevel, startScalingAtLevel, prevStartScalingAtLevel, levelRange, newLevel, badgeCount, levelSubtractor;
+	bool8 levelChangedForEvolution = FALSE;
+
+	badgeCount = GetOpenWorldBadgeCount();
+	minEnemyLevel = sLevelScales[badgeCount].minLevel;
+	startScalingAtLevel = sLevelScales[badgeCount].startScalingAtLevel;
+	prevStartScalingAtLevel = (badgeCount == 0) ? 0 : sLevelScales[badgeCount - 1].startScalingAtLevel;
+	levelRange = *level - minEnemyTeamLevel; //The offset in the team
+	newLevel = minEnemyLevel + levelRange;
+	
+	if (IsPseudoBossTrainerPartyForLevelScaling(trainerPartyFlags))
+	{
+		levelSubtractor = 0; //Allow pseudo bosses to be closer to the player's average level (and maybe even surpass their max)
+	}
+	else
+	{
+		#ifdef VAR_GAME_DIFFICULTY
+		levelSubtractor = (VarGet(VAR_GAME_DIFFICULTY) >= OPTIONS_EXPERT_DIFFICULTY) ? 0 : 5; //In Expert mode, Trainers always scale to your average level, other the average level - 5 at minimum
+		#else
+		levelSubtractor = 5;
+		#endif
+	}
+
+	if (newLevel > *level) //Trainer is weaker than they should be based on badge count
+	{
+		*level = MathMin(newLevel, MAX_LEVEL);
+		levelChangedForEvolution = TRUE;
+	}
+
+	if (averagePlayerTeamLevel >= startScalingAtLevel //Team is stronger than Gym Leader would be normally
+	#ifdef VAR_GAME_DIFFICULTY
+	|| VarGet(VAR_GAME_DIFFICULTY) >= OPTIONS_HARD_DIFFICULTY //Or the game is on on a harder setting
+	#endif
+	)
+	{
+		//So scale normal enemies based on the average team level
+		newLevel = MathMin(averagePlayerTeamLevel + levelRange - levelSubtractor, MAX_LEVEL);
+		if (*level < newLevel)
+			*level = newLevel;
+	}
+	else if (averagePlayerTeamLevel >= prevStartScalingAtLevel) //Team is stronger than prev Gym Leader
+	{
+		//So scale normal enemies based on the previous Gym's start scaling level
+		//This section is most likely never going to be used
+		newLevel = MathMin(prevStartScalingAtLevel + levelRange - levelSubtractor, MAX_LEVEL);
+		if (prevStartScalingAtLevel > 0 && *level < newLevel)
+			*level = newLevel;
+	}
+
+	if (levelChangedForEvolution && shouldEvolve)
+		EvolveSpeciesByLevel(species, *level);
+	#endif
+}
+
+static void ModifySpeciesAndLevelForBossBattle(unusedArg u16* species, unusedArg u8* level, unusedArg u8 maxEnemyTeamLevel, unusedArg u8 maxPlayerTeamLevel, unusedArg bool8 canEvolve)
+{
+	#if (defined SCALED_TRAINERS && !defined  DEBUG_NO_LEVEL_SCALING)
+	u8 levelRange, newLevel;
+
+	levelRange = maxEnemyTeamLevel - *level; //The offset in the team from the strongest mon
+	newLevel = (maxPlayerTeamLevel - levelRange) + 1; //Boss battles always have a Pokemon 1 level higher than the player's strongest mon
+
+	if (*level < newLevel)
 	{
 		*level = newLevel;
-		EvolveSpeciesByLevel(species, *level);
+		if (canEvolve)
+			EvolveSpeciesByLevel(species, *level);
 	}
+	#endif
+}
+
+u8 GetScaledWildBossLevel(u8 level)
+{
+	#if (defined SCALED_TRAINERS && !defined DEBUG_NO_LEVEL_SCALING)
+	//Scale directly to biased average team level + 1 - allows chance of being stronger than team if all the same level
+	u8 newLevel = GetPlayerBiasedAverageLevel(GetHighestMonLevel(gPlayerParty)) + 1;
+
+	if (level < newLevel)
+		level = newLevel;
+	#endif
+
+	return level;
 }
 
 //Returns the number of Pokemon
@@ -1562,7 +1725,7 @@ const struct BattleTowerSpread* GetRaidMultiSpread(u8 multiId, u8 index, u8 numS
 	if (index == 0 && multiPartner->owNum == EVENT_OBJ_GFX_RIVAL)
 	{
 		#define VAR_RIVAL_CHOSEN_STARTER 0x5012
-		switch (VAR_RIVAL_CHOSEN_STARTER) {
+		switch (VarGet(VAR_RIVAL_CHOSEN_STARTER)) {
 			case 2: //Chose Larvitar
 				spread = &multiPartner->spreads[numStars][4]; //Rival has Metagross
 				break;
@@ -1661,7 +1824,10 @@ static void CreateFrontierMon(struct Pokemon* mon, const u8 level, const struct 
 		ballType = MathMin(LAST_BALL_INDEX, spread->ball);
 	else
 		ballType = umodsi(Random(), NUM_BALLS);
-	SetMonData(mon, REQ_POKEBALL, &ballType);
+	SetMonData(mon, MON_DATA_POKEBALL, &ballType);
+
+	if (spread->gigantamax)
+		mon->gigantamax = TRUE;
 
 	TryFormRevert(mon); //To fix Minior forms
 	CalculateMonStatsNew(mon);
@@ -1718,7 +1884,7 @@ void GiveMonNatureAndAbility(struct Pokemon* mon, u8 nature, u8 abilityNum, bool
 	u8 gender = GetGenderFromSpeciesAndPersonality(species, personality);
 	u8 letter = GetUnownLetterFromPersonality(personality);
 	bool8 isMinior = IsMinior(species);
-	u8 miniorCore = GetMiniorCoreSpecies(mon);
+	u8 miniorCore = GetMiniorCoreFromPersonality(personality);
 
 	if (abilityNum == 0xFF) //Hidden Ability
 		mon->hiddenAbility = TRUE;
@@ -1742,7 +1908,7 @@ void GiveMonNatureAndAbility(struct Pokemon* mon, u8 nature, u8 abilityNum, bool
 	} while (GetNatureFromPersonality(personality) != nature
 	|| (keepGender && GetGenderFromSpeciesAndPersonality(species, personality) != gender)
 	|| (keepLetterCore && species == SPECIES_UNOWN && GetUnownLetterFromPersonality(personality) != letter) //Make sure the Unown letter doesn't change
-	|| (keepLetterCore && isMinior && miniorCore != GetMiniorCoreSpecies(mon))); //Make sure the Minior core doesn't change
+	|| (keepLetterCore && isMinior && GetMiniorCoreFromPersonality(personality) != miniorCore)); //Make sure the Minior core doesn't change
 
 	mon->personality = personality;
 }
@@ -2513,8 +2679,9 @@ static u16 GivePlayerFrontierMonGivenSpecies(const u16 species, const struct Bat
 	return GiveMonToPlayer(&mon);
 }
 
-void CreateFrontierRaidMon(unusedArg u16 species)
+void CreateFrontierRaidMon(u16 originalSpecies)
 {
+	u16 species;
 	struct Pokemon mon;
 	const struct BattleTowerSpread* spreadPtr = (const struct BattleTowerSpread*) gPokeBackupPtr;
 
@@ -2525,9 +2692,14 @@ void CreateFrontierRaidMon(unusedArg u16 species)
 	spreadPtr = TryAdjustSpreadForSpecies(spreadPtr); //Update Arceus
 	struct BattleTowerSpread spread = *spreadPtr;
 
-	species = GetMegaSpecies(spread.species, spread.item, spread.moves); //Try Mega Evolve the mon
-	if (species != SPECIES_NONE)
-		spread.species = species;
+	if (IsGigantamaxSpecies(originalSpecies)) //Player was shown Gigantamaxed form
+		spread.species = originalSpecies; //Update with Gigantamax form
+	else
+	{
+		species = GetMegaSpecies(spread.species, spread.item, spread.moves); //Try Mega Evolve the mon
+		if (species != SPECIES_NONE)
+			spread.species = species; //Update with Mega Species
+	}
 
 	CreateFrontierMon(&mon, 50, &spread, 0, 0, 0, TRUE);
 	ZeroEnemyPartyMons();
@@ -3098,19 +3270,22 @@ static u8 GetPartyIdFromPartyData(struct Pokemon* mon)
 
 static u8 GetHighestMonLevel(const struct Pokemon* const party)
 {
-	u8 max = party[0].level;
+	u8 max = GetMonData(&party[0], MON_DATA_LEVEL, NULL);
 
 	for (int i = 1; i < PARTY_SIZE; ++i)
 	{
-		if (max == MAX_LEVEL
-		||  party[i].species == SPECIES_NONE)
+		u8 level;
+		u16 species = GetMonData(&party[i], MON_DATA_SPECIES2, NULL);
+	
+		if (max == MAX_LEVEL || species == SPECIES_NONE)
 			return max;
 
-		if (GetMonData(&party[i], MON_DATA_IS_EGG, NULL))
+		if (species == SPECIES_EGG)
 			continue;
 
-		if (party[i].level > max)
-			max = party[i].level;
+		level = GetMonData(&party[i], MON_DATA_LEVEL, NULL);
+		if (level > max)
+			max = level;
 	}
 
 	return max;
@@ -3215,11 +3390,21 @@ u8 ScriptGiveMon(u16 species, u8 level, u16 item, unusedArg u32 unused1, u32 cus
 		mon.pokeball = ballType;
 	#endif
 
+	#ifdef FLAG_HIDDEN_ABILITY
 	if (FlagGet(FLAG_HIDDEN_ABILITY))
 	{
 		mon.hiddenAbility = TRUE;
 		FlagClear(FLAG_HIDDEN_ABILITY);
 	}
+	#endif
+
+	#ifdef FLAG_GIGANTAMAXABLE
+	if (FlagGet(FLAG_GIGANTAMAXABLE))
+	{
+		mon.gigantamax = TRUE;
+		FlagClear(FLAG_GIGANTAMAXABLE);
+	}
+	#endif
 
 	#ifdef GIVEPOKEMON_CUSTOM_HACK
 	if (customGivePokemon != 0)
@@ -3317,7 +3502,31 @@ u32 CheckShinyMon(struct Pokemon* mon)
 
 	return personality;
 };
+ 
+void TryRandomizeSpecies(unusedArg u16* species)
+{
+	#ifdef FLAG_POKEMON_RANDOMIZER
+	if (FlagGet(FLAG_POKEMON_RANDOMIZER) && !FlagGet(FLAG_BATTLE_FACILITY) && *species != SPECIES_NONE && *species < NUM_SPECIES)
+	{
+		u32 id = MathMax(1, T1_READ_32(gSaveBlock2->playerTrainerId)); //0 id would mean every Pokemon would crash the game
+		u32 newSpecies = *species;
 
+		do
+		{
+			newSpecies *= id;
+			newSpecies = MathMax(1, newSpecies % NUM_SPECIES_RANDOMIZER);
+		} while (CheckTableForSpecies(newSpecies, gRandomizerSpeciesBanList));
+		
+		*species = newSpecies;
+	}
+	#endif
+}
+
+u16 GetRandomizedSpecies(u16 species)
+{
+	TryRandomizeSpecies(&species);
+	return species;
+}
 
 void CreateBoxMon(struct BoxPokemon* boxMon, u16 species, u8 level, u8 fixedIV, bool8 hasFixedPersonality, u32 fixedPersonality, u8 otIdType, u32 fixedOtId)
 {
@@ -3326,17 +3535,7 @@ void CreateBoxMon(struct BoxPokemon* boxMon, u16 species, u8 level, u8 fixedIV, 
 	u32 personality;
 	u32 value;
 
-#ifdef FLAG_POKEMON_RANDOMIZER
-	if (FlagGet(FLAG_POKEMON_RANDOMIZER) && !FlagGet(FLAG_BATTLE_FACILITY)) //Don't randomize in battle facilities
-	{
-		u32 id = MathMax(1, T1_READ_32(gSaveBlock2->playerTrainerId)); //0 id would mean every Pokemon would crash the game
-		u32 newSpecies = species * id;
-		species = MathMax(1, newSpecies % NUM_SPECIES);
-
-		while (CheckTableForSpecies(species, gRandomizerSpeciesBanList))
-			species *= id;
-	}
-#endif
+	TryRandomizeSpecies(&species);
 
 	ZeroBoxMonData(boxMon);
 	if (hasFixedPersonality)
@@ -3377,6 +3576,9 @@ void CreateBoxMon(struct BoxPokemon* boxMon, u16 species, u8 level, u8 fixedIV, 
 	value = BALL_TYPE_POKE_BALL;
 	SetBoxMonData(boxMon, MON_DATA_POKEBALL, &value);
 	SetBoxMonData(boxMon, MON_DATA_OT_GENDER, &gSaveBlock2->playerGender);
+
+	if (IsGigantamaxSpecies(species))
+		boxMon->substruct3.gigantamax = TRUE;
 
 	if (fixedIV < 32)
 	{

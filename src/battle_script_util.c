@@ -1349,11 +1349,16 @@ void PluckBerryEat(void)
 	gBattlescriptCurrInstr += 5;
 
 	if (ItemBattleEffects(ItemEffects_EndTurn, gBankAttacker, TRUE, TRUE))
-		gBattlescriptCurrInstr -= 5;
+		gNewBS->doingPluckItemEffect = TRUE;
 	else if (ItemBattleEffects(ItemEffects_ContactTarget, gBankAttacker, TRUE, TRUE))
-		gBattlescriptCurrInstr -= 5;
-	else
-		gBattlescriptCurrInstr -= 5;
+		gNewBS->doingPluckItemEffect = TRUE;
+
+	gBattlescriptCurrInstr -= 5;
+}
+
+void ClearDoingPluckItemEffect(void)
+{
+	gNewBS->doingPluckItemEffect = FALSE;
 }
 
 void BurnUpFunc(void)
@@ -1636,13 +1641,18 @@ void RestoreBanksFromSynchronize(void)
 void TrySetAlternateFlingEffect(void)
 {
 	u8 effect = ItemId_GetHoldEffect(ITEM(gBankAttacker));
+	gBattlescriptCurrInstr += 5;
 
-	switch (effect) {
-		case ITEM_EFFECT_CURE_ATTRACT:
-		case ITEM_EFFECT_RESTORE_STATS:
-			if (ItemBattleEffects(ItemEffects_EndTurn, gBankTarget, TRUE, TRUE))
-				gBattlescriptCurrInstr -= 5;
+	if (effect == ITEM_EFFECT_CURE_ATTRACT || effect == ITEM_EFFECT_RESTORE_STATS
+	|| IsBerry(ITEM(gBankAttacker)))
+	{
+		if (ItemBattleEffects(ItemEffects_EndTurn, gBankTarget, TRUE, TRUE))
+			gNewBS->doingPluckItemEffect = TRUE;
+		else if (ItemBattleEffects(ItemEffects_ContactTarget, gBankTarget, TRUE, TRUE))
+			gNewBS->doingPluckItemEffect = TRUE;
 	}
+
+	gBattlescriptCurrInstr -= 5;
 }
 
 void TransferLastUsedItem(void)
@@ -2123,14 +2133,6 @@ void ClearCalculatedSpreadMoveData(void)
 	gNewBS->calculatedSpreadMoveData = FALSE;
 }
 
-void TryActivateDefiantForStickyWeb(void)
-{
-	gBattlescriptCurrInstr += 5; //So this is over if Defiant activates
-
-	DefiantActivation();
-	gBattlescriptCurrInstr -= 5; //Reset either normal script or Defiant script
-}
-
 void ClearScriptingBankDisguisedAs(void)
 {
 	gNewBS->disguisedAs[gBattleScripting.bank] = SPECIES_NONE;
@@ -2140,4 +2142,26 @@ void GotoMoveEndIfMoveDidntDamageAtLeastOnce(void)
 {
 	if (!gNewBS->AttackerDidDamageAtLeastOnce)
 		gBattlescriptCurrInstr = BattleScript_MoveEnd - 5;
+}
+
+void SetSwitchingBankToPlayer0(void)
+{
+	gBankSwitching = GetBattlerAtPosition(B_POSITION_PLAYER_LEFT);
+}
+
+void SetAttackerAndSwitchingBankToOpponent0(void)
+{
+	gBankAttacker = gBankSwitching = GetBattlerAtPosition(B_POSITION_OPPONENT_LEFT);
+}
+
+void SetSwitchingBankSwitchingCooldownTo2(void)
+{
+	gNewBS->ai.sideSwitchedThisRound |= gBitTable[SIDE(gBankSwitching)];
+	if (!(gNewBS->ai.sideSwitchedThisRound & gBitTable[SIDE(FOE(gBankSwitching))])) //There was no change on the other side of the field
+		gNewBS->ai.switchingCooldown[gBankSwitching] = 2;
+}
+
+void FaintedBankNameInBuff1(void)
+{
+    PREPARE_MON_NICK_BUFFER(gBattleTextBuff1, gBankFainted, gBattlerPartyIndexes[gBankFainted]);
 }

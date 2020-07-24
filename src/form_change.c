@@ -93,8 +93,6 @@ void DoFormChange(u8 bank, u16 species, bool8 ReloadType, bool8 ReloadStats, boo
 	SetMonData(mon, MON_DATA_SPECIES, &backup); //Backup species is written to by the form change handler
 }
 
-//This function could have been much simpler if I didn't care about stupid people who
-//would give people the below mentioned species before battle.
 void SwitchOutFormsRevert(u8 bank)
 {
 	struct Pokemon* mon = GetBankPartyData(bank);
@@ -184,7 +182,7 @@ bool8 TryFormRevert(pokemon_t* mon)
 		CalculateMonStats(mon);
 		return TRUE;
 	}
-	else if (CheckTableForSpecies(mon->backupSpecies, sBannedBackupSpecies)) //Forms the mon shouldn't revert to
+	else if (IsGigantamaxSpecies(mon->backupSpecies) || CheckTableForSpecies(mon->backupSpecies, sBannedBackupSpecies)) //Forms the mon shouldn't revert to
 	{
 		mon->backupSpecies = SPECIES_NONE;
 	}
@@ -272,9 +270,14 @@ void UpdateBurmy(void)
 	#endif
 }
 
+species_t GetMiniorCoreFromPersonality(u32 personality)
+{
+	return gMiniorCores[personality % (NELEMS(gMiniorCores) - 1)];
+}
+
 species_t GetMiniorCoreSpecies(struct Pokemon* mon)
 {
-	return gMiniorCores[mon->personality % (ARRAY_COUNT(gMiniorCores) - 1)];
+	return GetMiniorCoreFromPersonality(mon->personality);
 }
 
 bool8 IsMinior(u16 species)
@@ -474,13 +477,6 @@ void HoldItemFormChange(struct Pokemon* mon, u16 item)
 		SetMonData(mon, MON_DATA_SPECIES, &targetSpecies);
 		CalculateMonStats(mon);
 	}
-}
-
-void HoopaShayminPCRevertLogic(struct Pokemon* dst, void* src)
-{
-	Memcpy(dst, src, sizeof(struct Pokemon));
-
-	HoopaShayminPCRevertCheck(dst, TRUE);
 }
 
 void HoopaShayminPCRevertCheck(struct Pokemon* mon, bool8 recalcStats)

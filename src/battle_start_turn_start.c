@@ -1273,10 +1273,7 @@ static void TrySetupRaidBossRepeatedAttack(u8 actionFuncId)
 
 		if (gBankAttacker != BANK_RAID_BOSS //Just in case the player KOs the partner and sets the bit
 		|| CountAliveMonsInBattle(BATTLE_ALIVE_DEF_SIDE, gBankAttacker, FOE(gBankAttacker)) == 0) //Don't attack again if no one left to hit
-		{
-			gNewBS->dynamaxData.attackAgain = FALSE;
 			return;
-		}
 
 		moveLimitations = CheckMoveLimitations(gBankAttacker, 0, 0xFF);
 
@@ -1311,22 +1308,36 @@ static void TrySetupRaidBossRepeatedAttack(u8 actionFuncId)
 	}
 }
 
+static u16 GetRandomBattleBGM(void)
+{
+	u16 song;
+
+	do //Assumes table has legit music
+	{
+		song = gRandomBattleMusicOptions[Random() % gRandomBattleMusicOptionsLength];
+	} while (song == 0); //Song is not legit
+
+	return song;
+}
+
 u16 GetMUS_ForBattle(void)
 {
 	u16 song;
 
 	if (gBattleTypeFlags & BATTLE_TYPE_LINK)
 	{
-		if (VarGet(VAR_BATTLE_FACILITY_SONG_OVERRIDE))
-			return VarGet(VAR_BATTLE_FACILITY_SONG_OVERRIDE); //Play custom song
-		else
-		{
-			#ifdef UNBOUND
-				return BGM_BATTLE_BORRIUS_TRAINER;
-			#else
-				return BGM_BATTLE_RSE_TRAINER;
-			#endif
-		}
+		song = VarGet(VAR_BATTLE_FACILITY_SONG_OVERRIDE); //Check custom song
+		if (song == BGM_RANDOM_BATTLE_MUSIC)
+			song = GetRandomBattleBGM();
+
+		if (song != 0)
+			return song;
+
+		#ifdef UNBOUND
+			return BGM_BATTLE_BORRIUS_TRAINER;
+		#else
+			return BGM_BATTLE_RSE_TRAINER;
+		#endif
 	}
 
 	if (gBattleTypeFlags & BATTLE_TYPE_TRAINER)
@@ -1364,12 +1375,7 @@ u16 GetMUS_ForBattle(void)
 			//Then try loading the song override
 			song = VarGet(VAR_BATTLE_FACILITY_SONG_OVERRIDE);
 			if (song == BGM_RANDOM_BATTLE_MUSIC)
-			{
-				do //Assumes table has legit music
-				{
-					song = gRandomBattleMusicOptions[Random() % gRandomBattleMusicOptionsLength];
-				} while (song == 0); //Song is not legit
-			}
+				song = GetRandomBattleBGM();
 
 			if (song != 0)
 				return song;
@@ -1418,7 +1424,7 @@ u16 GetMUS_ForBattle(void)
 
 	#ifdef UNBOUND
 		if (IsRaidBattle())
-			return BGM_BATTLE_GALACTIC_BOSS;
+			return BGM_BATTLE_RAID_BOSS;
 
 		#ifdef VAR_WILD_BGM_OVERRIDE
 			song = VarGet(VAR_WILD_BGM_OVERRIDE);

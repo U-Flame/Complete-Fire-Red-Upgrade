@@ -13,6 +13,7 @@
 #include "../include/new/battle_start_turn_start_battle_scripts.h"
 #include "../include/new/battle_util.h"
 #include "../include/new/cmd49_battle_scripts.h"
+#include "../include/new/end_battle.h"
 #include "../include/new/damage_calc.h"
 #include "../include/new/dynamax.h"
 #include "../include/new/form_change.h"
@@ -33,6 +34,7 @@ switching.c
 
 enum SwitchInStates
 {
+	SwitchIn_HandleAICooldown,
 	SwitchIn_CamomonsReveal,
 	SwitchIn_HealingWish,
 	SwitchIn_ZHealingWish,
@@ -114,7 +116,12 @@ void atkE2_switchoutabilities(void)
 			++gNewBS->switchOutAbilitiesState;
 			break;
 
-		case 4: //Done
+		case 4: //Gigantamax reversion
+			TryRevertBankGigantamax(gActiveBattler);
+			++gNewBS->switchOutAbilitiesState;
+			break;
+
+		case 5: //Done
 			gNewBS->switchOutAbilitiesState = 0; //Reset for next time
 			gBattlescriptCurrInstr += 2;
 	}
@@ -254,7 +261,10 @@ static bool8 TryActivateFlowerGift(u8 leavingBank)
 
 	for (u8 bank = gBanksByTurnOrder[i]; i < gBattlersCount; ++i, bank = gBanksByTurnOrder[i])
 	{
-		if ((ABILITY(bank) == ABILITY_FLOWERGIFT ||  ABILITY(bank) == ABILITY_FORECAST)) //Just in case someone with Air Lock/Cloud Nine switches out
+		if (bank == leavingBank)
+			continue; //Don't do this form change if you're the bank switching out
+
+		if ((ABILITY(bank) == ABILITY_FLOWERGIFT || ABILITY(bank) == ABILITY_FORECAST)) //Just in case someone with Air Lock/Cloud Nine switches out
 		{
 			gStatuses3[bank] &= ~STATUS3_SWITCH_IN_ABILITY_DONE;
 
@@ -523,6 +533,24 @@ void atk52_switchineffects(void)
 		gNewBS->switchInEffectsState = SwitchIn_PrimalReversion;
 
 	switch (gNewBS->switchInEffectsState) {
+		case SwitchIn_HandleAICooldown:
+			if (SIDE(gActiveBattler) == B_SIDE_PLAYER) //Player switched in a Pokemon
+			{
+				//If the player switches out their Pokemon, allow the AI to immediately switch out if it wants to
+				gNewBS->ai.switchingCooldown[GetBattlerAtPosition(B_POSITION_OPPONENT_LEFT)] = 0;
+				if (IS_DOUBLE_BATTLE)
+					gNewBS->ai.switchingCooldown[GetBattlerAtPosition(B_POSITION_OPPONENT_RIGHT)] = 0;
+			}
+			else
+			{
+				gNewBS->ai.switchingCooldown[GetBattlerAtPosition(B_POSITION_PLAYER_LEFT)] = 0;
+				if (IS_DOUBLE_BATTLE)
+					gNewBS->ai.switchingCooldown[GetBattlerAtPosition(B_POSITION_PLAYER_RIGHT)] = 0;
+			}
+
+			++gNewBS->switchInEffectsState;
+			//Fallthrough
+
 		case SwitchIn_CamomonsReveal:
 			if (gBattleTypeFlags & BATTLE_TYPE_CAMOMONS)
 			{
@@ -811,10 +839,10 @@ void atk52_switchineffects(void)
 			++gNewBS->switchInEffectsState;
 			#ifdef BGM_BATTLE_GYM_LEADER_LAST_POKEMON
 			if (gBattleTypeFlags & BATTLE_TYPE_TRAINER
-			&& !(gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_FRONTIER | BATTLE_TYPE_TRAINER_TOWER))
+			&& !(gBattleTypeFlags & (BATTLE_TYPE_DOUBLE | BATTLE_TYPE_LINK | BATTLE_TYPE_FRONTIER | BATTLE_TYPE_TRAINER_TOWER))
 			&& gTrainers[gTrainerBattleOpponent_A].trainerClass == CLASS_LEADER
-			&& ((IS_SINGLE_BATTLE && ViableMonCount(gEnemyParty) <= 1)
-			 || (IS_DOUBLE_BATTLE && ViableMonCount(gEnemyParty) <= 2)))
+			&& SIDE(gActiveBattler) == B_SIDE_OPPONENT //So player accepting offer to switching out doesn't trigger this yet
+			&& ViableMonCount(gEnemyParty) <= 1)
 			{
 				PlayBGM(BGM_BATTLE_GYM_LEADER_LAST_POKEMON);
 			}
@@ -909,7 +937,6 @@ void RestorePPLunarDance(void)
 }
 
 //Ripped from PokeEmerald
-#define MON_CAN_BATTLE(mon) (((GetMonData(mon, MON_DATA_SPECIES, NULL) != SPECIES_NONE && !GetMonData(mon, MON_DATA_IS_EGG, NULL) && GetMonData(mon, MON_DATA_HP, NULL) != 0)))
 void atk8F_forcerandomswitch(void)
 {
 	int i;
@@ -1025,7 +1052,7 @@ static bool8 TryDoForceSwitchOut(void)
 	}
 	
 	//Roar always fails in wild boss battles
-	else if (FlagGet(FLAG_NO_RUNNING) || FlagGet(FLAG_NO_CATCHING_AND_RUNNING))
+	else if (AreAllKindsOfRunningPrevented())
 	{
 		gBattlescriptCurrInstr = T1_READ_PTR(gBattlescriptCurrInstr + 3);
 		return FALSE;
@@ -1119,6 +1146,7 @@ void ClearSwitchBytes(u8 bank)
 	gNewBS->statFellThisTurn[bank] = FALSE;
 	gNewBS->dynamaxData.timer[bank] = 0;
 	gNewBS->zMoveData.toBeUsed[bank] = 0; //Force switch or fainted before Z-Move could be used
+	gNewBS->chiStrikeCritBoosts[bank] = 0;
 	gNewBS->sandblastCentiferno[bank] = 0;
 	gNewBS->disguisedAs[bank] = 0;
 

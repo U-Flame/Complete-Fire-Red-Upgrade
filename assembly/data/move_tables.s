@@ -504,6 +504,7 @@ gSheerForceBoostedMoves:
 .hword MOVE_BUBBLEBEAM
 .hword MOVE_BUGBUZZ
 .hword MOVE_BULLDOZE
+.hword MOVE_BURNINGJEALOUSY
 .hword MOVE_CHARGEBEAM
 .hword MOVE_CHATTER
 .hword MOVE_CLANGOROUS_SOULBLAZE
@@ -1012,6 +1013,7 @@ gMovesCanUnfreezeAttacker:
 .hword MOVE_SACREDFIRE
 .hword MOVE_FLAREBLITZ
 .hword MOVE_SCALD
+.hword MOVE_SCORCHINGSANDS
 .hword MOVE_FUSIONFLARE
 .hword MOVE_STEAMERUPTION
 .hword MOVE_BURNUP
@@ -1023,6 +1025,7 @@ gMovesCanUnfreezeAttacker:
 gMovesCanUnfreezeTarget:
 .hword MOVE_SCALD
 .hword MOVE_STEAMERUPTION
+.hword MOVE_SCORCHINGSANDS
 .hword MOVE_TABLES_TERMIN
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@

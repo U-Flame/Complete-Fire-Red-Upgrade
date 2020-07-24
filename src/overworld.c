@@ -1,6 +1,7 @@
 #include "defines.h"
 #include "defines_battle.h"
 #include "../include/battle_setup.h"
+#include "../include/bg.h"
 #include "../include/daycare.h"
 #include "../include/event_data.h"
 #include "../include/event_object_movement.h"
@@ -16,8 +17,10 @@
 #include "../include/fldeff_misc.h"
 #include "../include/item.h"
 #include "../include/link.h"
+#include "../include/list_menu.h"
 #include "../include/m4a.h"
 #include "../include/map_name_popup.h"
+#include "../include/map_preview_screen.h"
 #include "../include/map_scripts.h"
 #include "../include/metatile_behavior.h"
 #include "../include/overworld.h"
@@ -47,6 +50,7 @@
 #include "../include/new/overworld.h"
 #include "../include/new/overworld_data.h"
 #include "../include/new/party_menu.h"
+#include "../include/new/read_keys.h"
 #include "../include/new/wild_encounter.h"
 
 /*
@@ -82,15 +86,16 @@ static void UpdateJPANStepCounters(void);
 static const u8* GetCustomWalkingScript(void);
 static bool8 SafariZoneTakeStep(void);
 static bool8 IsRunningDisabledByFlag(void);
+static bool8 UseRegisteredKeyItemOnField(void);
 
 #ifdef VAR_DEFAULT_WALKING_SCRIPT
 //Table full of pointers to custom walking scripts
 static const u8* const sDefaultWalkingScripts[] =
 {
 	NULL,
-	NULL,
-	NULL,
-	NULL,
+	//NULL,
+	//NULL,
+	//NULL,
 	//etc
 };
 #endif
@@ -706,6 +711,7 @@ static bool8 CheckTrainerSpotting(u8 eventObjId) //Or just CheckTrainer
 			case TRAINER_BATTLE_REMATCH_DOUBLE:
 			case TRAINER_BATTLE_CONTINUE_SCRIPT_DOUBLE:
 			case TRAINER_BATTLE_TWO_OPPONENTS:
+			case TRAINER_BATTLE_REMATCH_TWO_OPPONENTS:
 			case TRAINER_BATTLE_DOUBLE_SCALED:
 				if (ViableMonCount(gPlayerParty) < 2 && !FlagGet(FLAG_TAG_BATTLE))
 					return FALSE;
@@ -886,11 +892,16 @@ const u8* BattleSetup_ConfigureTrainerBattle(const u8* data)
 
 		case TRAINER_BATTLE_OAK_TUTORIAL:
 			#ifdef TUTORIAL_BATTLES
-				if (Var8000 != 0xFEFE)
-					TrainerBattleLoadArgs(sOakTutorialParams, data);
-				else //Regular trainer battle 9
+			if (Var8000 != 0xFEFE)
+				TrainerBattleLoadArgs(sOakTutorialParams, data);
+			else //Regular trainer battle 9
 			#endif
-					TrainerBattleLoadArgs(sContinueLostBattleParams, data);
+			{
+				TrainerBattleLoadArgs(sContinueLostBattleParams, data);
+				gTrainerBattleOpponent_A = VarGet(gTrainerBattleOpponent_A); //Allow dynamic loading
+				if (FlagGet(FLAG_TWO_OPPONENTS))
+					gTrainerBattleOpponent_B = VarGet(VAR_SECOND_OPPONENT);
+			}
 			return EventScript_DoTrainerBattle;
 
 		case TRAINER_BATTLE_MULTI:
@@ -911,6 +922,18 @@ const u8* BattleSetup_ConfigureTrainerBattle(const u8* data)
 			FlagSet(FLAG_TWO_OPPONENTS);
 			gApproachingTrainerId = 0;
 			return EventScript_TryDoTwoOpponentBattle;
+
+		case TRAINER_BATTLE_REMATCH_TWO_OPPONENTS:
+			TrainerBattleLoadArgs(sTwoOpponentBattleParams, data);
+			SetMapVarsToTrainer();
+			#ifndef UNBOUND
+			gTrainerBattleOpponent_A = GetRematchTrainerId(gTrainerBattleOpponent_A);
+			gTrainerBattleOpponent_B = GetRematchTrainerId(gTrainerBattleOpponent_B);
+			#endif
+			VarSet(VAR_SECOND_OPPONENT, gTrainerBattleOpponent_B);
+			FlagSet(FLAG_TWO_OPPONENTS);
+			gApproachingTrainerId = 0;
+			return EventScript_TryDoTwoOpponentRematchBattle;
 
 		case TRAINER_BATTLE_TAG:
 			TrainerBattleLoadArgs(sTagBattleParams, data);
@@ -938,7 +961,10 @@ const u8* BattleSetup_ConfigureTrainerBattle(const u8* data)
 
 bool8 IsTrainerBattleModeAgainstTwoOpponents(void)
 {
-	return sTrainerBattleMode == TRAINER_BATTLE_MULTI || sTrainerBattleMode == TRAINER_BATTLE_TWO_OPPONENTS || FlagGet(FLAG_TWO_OPPONENTS);
+	return sTrainerBattleMode == TRAINER_BATTLE_MULTI
+		|| sTrainerBattleMode == TRAINER_BATTLE_TWO_OPPONENTS
+		|| sTrainerBattleMode == TRAINER_BATTLE_REMATCH_TWO_OPPONENTS
+		|| FlagGet(FLAG_TWO_OPPONENTS);
 }
 
 bool8 IsTrainerBattleModeWithPartner(void)
@@ -1105,7 +1131,7 @@ const u8* GetIntroSpeechOfApproachingTrainer(void)
 //Special 0x35
 const u8* GetTrainerCantBattleSpeech(void)
 {
-	if (sTrainerBattleMode == TRAINER_BATTLE_TWO_OPPONENTS
+	if ((sTrainerBattleMode == TRAINER_BATTLE_TWO_OPPONENTS || sTrainerBattleMode == TRAINER_BATTLE_REMATCH_TWO_OPPONENTS)
 	&& gEventObjects[gSelectedEventObject].localId == ExtensionState.spotted.secondTrainerNPCId)
 		return ReturnEmptyStringIfNull((const u8*) sTrainerCannotBattleSpeech_B);
 	else
@@ -1254,7 +1280,11 @@ void LoadProperIntroSpeechForTwoOpponentSighting(void)
 void PrepTrainerB(void)
 {
 	if (gEventObjects[gSelectedEventObject].localId == ExtensionState.spotted.firstTrainerNPCId)
+	{
 		gSelectedEventObject = GetEventObjectIdByLocalId(ExtensionState.spotted.secondTrainerNPCId);
+		OverrideMovementTypeForEventObject(&gEventObjects[gSelectedEventObject], GetTrainerFacingDirectionMovementType(gEventObjects[gSelectedEventObject].facingDirection));
+		OverrideTemplateCoordsForEventObject(&gEventObjects[gSelectedEventObject]);
+	}
 	else
 		gSelectedEventObject = GetEventObjectIdByLocalId(ExtensionState.spotted.firstTrainerNPCId);
 
@@ -1454,6 +1484,7 @@ bool8 TryStartStepCountScript(u16 metatileBehavior)
 		const u8* customWalkingScript = GetCustomWalkingScript();
 		if (customWalkingScript != NULL)
 		{
+			break_func(customWalkingScript);
 			ScriptContext1_SetupScript(customWalkingScript);
 			return TRUE;
 		}
@@ -1489,7 +1520,7 @@ static const u8* GetCustomWalkingScript(void)
 		return gWalkingScript;
 
 	u8 scriptInd = VarGet(VAR_DEFAULT_WALKING_SCRIPT);
-	if (scriptInd != 0 || scriptInd > ARRAY_COUNT(sDefaultWalkingScripts))
+	if (scriptInd != 0 && scriptInd <= ARRAY_COUNT(sDefaultWalkingScripts))
 		return sDefaultWalkingScripts[scriptInd - 1];
 	#endif
 
@@ -1533,6 +1564,7 @@ void RunOnTransitionMapScript(void)
 	gCurrentDexNavChain = 0;
 	gFishingStreak = 0;
 	gLastFishingSpecies = 0;
+	gDontFadeWhite = FALSE;
 	ResetMiningSpots();
 	ForceClockUpdate();
 	MapHeaderRunScriptByTag(3);
@@ -1609,15 +1641,7 @@ const u8* LoadProperWhiteoutString(const u8* string)
 		if (gSaveBlock1->location.mapNum != MAP_NUM(PLAYER_HOME)
 		||  gSaveBlock1->location.mapGroup != MAP_GROUP(PLAYER_HOME))
 		{
-			#ifdef FLAG_HEALER_DREAM
-			if (FlagGet(FLAG_HEALER_DREAM))
-			{
-				FlagClear(FLAG_HEALER_DREAM);
-				string = gText_AllJustADream;
-			}
-			else
-			#endif
-				string = gText_ScurriedToNearestHealer;
+			string = gText_ScurriedToNearestHealer;
 		}
 	}
 	#endif
@@ -1905,7 +1929,9 @@ bool8 IsCurrentAreaAutumn(void)
 		return mapSec == MAPSEC_TEHL_TOWN
 			|| mapSec == MAPSEC_ROUTE_9
 			|| mapSec == MAPSEC_ROUTE_10
-			|| mapSec == MAPSEC_AUBURN_WATERWAY;
+			|| mapSec == MAPSEC_AUBURN_WATERWAY
+			|| (mapSec == MAPSEC_HIDDEN_GROTTO
+			 && MAP_IS(HIDDEN_GROTTO_AUTUMN));
 	#else
 		return FALSE;
 	#endif
@@ -1922,7 +1948,9 @@ bool8 IsCurrentAreaWinter(void)
 			|| mapSec == MAPSEC_BLIZZARD_CITY
 			|| mapSec == MAPSEC_FROZEN_FOREST
 			|| (mapSec == MAPSEC_VICTORY_ROAD
-			 && MAP_IS(VICTORY_ROAD_MOUNTAINSIDE));
+			 && MAP_IS(VICTORY_ROAD_MOUNTAINSIDE))
+			|| (mapSec == MAPSEC_HIDDEN_GROTTO
+			 && MAP_IS(HIDDEN_GROTTO_WINTER));
 	#else
 		return FALSE;
 	#endif
@@ -1997,12 +2025,14 @@ bool8 InTanobyRuins(void)
 
 void PlayGrassFootstepNoise(void)
 {
-	PlaySE(SE_GRASS_FOOTSTEP);
+	if (IsFanfareTaskInactive()) //Sound interrupts fanfare
+		PlaySE(SE_GRASS_FOOTSTEP);
 }
 
 void PlaySandFootstepNoise(void)
 {
-	PlaySE(SE_SAND_FOOTSTEP);
+	if (IsFanfareTaskInactive()) //Sound interrupts fanfare
+		PlaySE(SE_SAND_FOOTSTEP);
 }
 
 extern bool8 (*const GetLedgeJumpFuncs[])(u8);
@@ -2031,202 +2061,6 @@ u8 GetLedgeJumpDirection(s16 x, s16 y, u8 direction)
 
 	return 0;
 }
-
-#define gFieldEffectObjectPaletteInfo1 (void*) 0x83A5348
-#define gFieldEffectObjectTemplatePointers ((const struct SpriteTemplate* const *) 0x83A0010)
-
-#ifdef UNBOUND //For Pokemon Unbound - Feel free to remove
-#define AUTUMN_GRASS_PALETTE_TAG 0x1215
-static u16 sAutumnGrassObjectPalette[] = {0x741F, 0x3E9B, 0x3E9B, 0x1993, 0x1570, 0x0167, 0x76AC, 0x62AC, 0x7B31, 0x7F92, 0x0, 0x0, 0x3A7A, 0x2E38, 0x2E38, 0x1DD6};
-static const struct SpritePalette sAutumnGrassObjectPaletteInfo = {sAutumnGrassObjectPalette, 0x1005};
-
-extern const u8 gFieldEffectObjectPic_SwampLongGrassTiles[];
-extern const u16 gFieldEffectObjectPic_SwampLongGrassPal[];
-static const struct SpritePalette sSwampGrassObjectPaletteInfo = {gFieldEffectObjectPic_SwampLongGrassPal, 0x1005};
-
-static const struct SpriteFrameImage sFieldEffectObjectPicTable_SwampLongGrass[] = {
-	overworld_frame(gFieldEffectObjectPic_SwampLongGrassTiles, 2, 2, 0),
-	overworld_frame(gFieldEffectObjectPic_SwampLongGrassTiles, 2, 2, 1),
-	overworld_frame(gFieldEffectObjectPic_SwampLongGrassTiles, 2, 2, 2),
-	overworld_frame(gFieldEffectObjectPic_SwampLongGrassTiles, 2, 2, 3),
-};
-
-const struct SpriteTemplate sFieldEffectObjectTemplate_SwampLongGrass = {0xFFFF, 0x1005, (void*) 0x83A36F0, (void*) 0x83A5938, sFieldEffectObjectPicTable_SwampLongGrass, gDummySpriteAffineAnimTable, (void*) (0x80DB69C | 1)};
-
-#endif
-
-static void GetSpriteTemplateAndPaletteForlGrassFieldEffect(const struct SpriteTemplate** spriteTemplate, const struct SpritePalette** spritePalette, u8 fieldEffectTemplateArg)
-{
-	switch (GetCurrentRegionMapSectionId()) {
-	#ifdef UNBOUND //For Pokemon Unbound - Feel free to remove
-		case MAPSEC_ROUTE_9:
-		case MAPSEC_ROUTE_10:
-		case MAPSEC_AUBURN_WATERWAY:
-			*spriteTemplate = gFieldEffectObjectTemplatePointers[fieldEffectTemplateArg];
-			*spritePalette = &sAutumnGrassObjectPaletteInfo;
-			break;
-		//case MAPSEC_POLDER_TOWN:
-		case MAPSEC_COOTES_BOG:
-			if (fieldEffectTemplateArg == 15) //Long Grass
-				*spriteTemplate = &sFieldEffectObjectTemplate_SwampLongGrass;
-			else
-				*spriteTemplate = gFieldEffectObjectTemplatePointers[fieldEffectTemplateArg];
-			*spritePalette = &sSwampGrassObjectPaletteInfo;
-			break;
-	#endif
-		default:
-			*spriteTemplate = gFieldEffectObjectTemplatePointers[fieldEffectTemplateArg];
-			*spritePalette = gFieldEffectObjectPaletteInfo1;
-			break;
-	}
-}
-
-static void FldEff_TallGrass(void)
-{
-	s32 x, y;
-	u8 spriteId;
-	const struct SpriteTemplate* spriteTemplate;
-	const struct SpritePalette* spritePalette; const struct SpritePalette** palettePointer; const struct SpritePalette*** palette2Pointer;
-	x = gFieldEffectArguments[0];
-	y = gFieldEffectArguments[1];
-	LogCoordsCameraRelative(&x, &y, 8, 8);
-
-	GetSpriteTemplateAndPaletteForlGrassFieldEffect(&spriteTemplate, &spritePalette, 4);
-	palettePointer = &spritePalette;
-	palette2Pointer = &palettePointer; //This way we fool the function into thinking it's a script.
-
-	FieldEffectScript_LoadFadedPalette((u8**) palette2Pointer);
-	spriteId = CreateSpriteAtEnd(spriteTemplate, x, y, 0);
-
-	if (spriteId != MAX_SPRITES)
-	{
-		struct Sprite *sprite;
-
-		sprite = &gSprites[spriteId];
-		sprite->coordOffsetEnabled = TRUE;
-		sprite->oam.priority = gFieldEffectArguments[3];
-		sprite->data[0] = gFieldEffectArguments[2];
-		sprite->data[1] = gFieldEffectArguments[0];
-		sprite->data[2] = gFieldEffectArguments[1];
-		sprite->data[3] = gFieldEffectArguments[4];
-		sprite->data[4] = gFieldEffectArguments[5];
-		sprite->data[5] = gFieldEffectArguments[6];
-		if (gFieldEffectArguments[7])
-		{
-			SeekSpriteAnim(sprite, 4);
-		}
-	}
-
-	PlayGrassFootstepNoise();
-}
-
-static void FldEff_JumpTallGrassLoadPalette(void)
-{
-	const struct SpriteTemplate* spriteTemplate;
-	const struct SpritePalette* spritePalette; const struct SpritePalette** palettePointer; const struct SpritePalette*** palette2Pointer;
-	palettePointer = &spritePalette;
-	palette2Pointer = &palettePointer; //This way we fool the function into thinking it's a script.
-
-	GetSpriteTemplateAndPaletteForlGrassFieldEffect(&spriteTemplate, &spritePalette, 4);
-	FieldEffectScript_LoadFadedPalette((u8**) palette2Pointer);
-	FldEff_JumpTallGrass();
-}
-
-static void FldEff_LongGrass(void)
-{
-	s32 x, y;
-	u8 spriteId;
-	struct Sprite *sprite;
-	const struct SpriteTemplate* spriteTemplate;
-	const struct SpritePalette* spritePalette; const struct SpritePalette** palettePointer; const struct SpritePalette*** palette2Pointer;
-	x = gFieldEffectArguments[0];
-	y = gFieldEffectArguments[1];
-	LogCoordsCameraRelative(&x, &y, 8, 8);
-
-	GetSpriteTemplateAndPaletteForlGrassFieldEffect(&spriteTemplate, &spritePalette, 15);
-	palettePointer = &spritePalette;
-	palette2Pointer = &palettePointer; //This way we fool the function into thinking it's a script.
-	FieldEffectScript_LoadFadedPalette((u8**) palette2Pointer);
-	spriteId = CreateSpriteAtEnd(spriteTemplate, x, y, 0);
-
-	if (spriteId != MAX_SPRITES)
-	{
-		sprite = &gSprites[spriteId];
-		sprite->coordOffsetEnabled = TRUE;
-		sprite->oam.priority = ZCoordToPriority(gFieldEffectArguments[2]);
-		sprite->data[0] = gFieldEffectArguments[2];
-		sprite->data[1] = gFieldEffectArguments[0];
-		sprite->data[2] = gFieldEffectArguments[1];
-		sprite->data[3] = gFieldEffectArguments[4];
-		sprite->data[4] = gFieldEffectArguments[5];
-		sprite->data[5] = gFieldEffectArguments[6];
-		if (gFieldEffectArguments[7])
-		{
-			SeekSpriteAnim(sprite, 6);
-		}
-	}
-
-	PlayGrassFootstepNoise();
-}
-
-static void FldEff_JumpLongGrassLoadPalette(void)
-{
-	const struct SpriteTemplate* spriteTemplate;
-	const struct SpritePalette* spritePalette; const struct SpritePalette** palettePointer; const struct SpritePalette*** palette2Pointer;
-	palettePointer = &spritePalette;
-	palette2Pointer = &palettePointer; //This way we fool the function into thinking it's a script.
-
-	GetSpriteTemplateAndPaletteForlGrassFieldEffect(&spriteTemplate, &spritePalette, 15);
-	FieldEffectScript_LoadFadedPalette((u8**) palette2Pointer);
-	FldEff_JumpLongGrass();
-}
-
-u32 FldEff_BikeTireTracks(void)
-{
-	s32 x, y;
-	u8 spriteId;
-    struct Sprite * sprite;
-	x = gFieldEffectArguments[0];
-	y = gFieldEffectArguments[1];
-	LogCoordsCameraRelative(&x, &y, 8, 8);
-
-    spriteId = CreateSpriteAtEnd(gFieldEffectObjectTemplatePointers[27], x, y, gFieldEffectArguments[2]);
-    if (spriteId != MAX_SPRITES)
-    {
-        sprite = &gSprites[spriteId];
-        sprite->coordOffsetEnabled = TRUE;
-        sprite->oam.priority = gFieldEffectArguments[3];
-        sprite->data[7] = FLDEFF_BIKE_TIRE_TRACKS;
-        StartSpriteAnim(sprite, gFieldEffectArguments[4]);
-    }
-	
-	PlaySE(SE_MUD_SLAP); //Different sound on bike
-    return spriteId;
-}
-
-const struct FieldEffectScript gFieldEffectScript_TallGrass =
-{
-	FLDEFF_CALLASM, FldEff_TallGrass,
-	FLDEFF_END,
-};
-
-const struct FieldEffectScript gFieldEffectScript_JumpTallGrass =
-{
-	FLDEFF_CALLASM, FldEff_JumpTallGrassLoadPalette,
-	FLDEFF_END,
-};
-
-const struct FieldEffectScript gFieldEffectScript_LongGrass =
-{
-	FLDEFF_CALLASM, FldEff_LongGrass,
-	FLDEFF_END,
-};
-
-const struct FieldEffectScript gFieldEffectScript_JumpLongGrass =
-{
-	FLDEFF_CALLASM, FldEff_JumpLongGrassLoadPalette,
-	FLDEFF_END,
-};
 
 const u8* GetInteractedMetatileScript(unusedArg struct MapPosition* position, u8 metatileBehavior, u8 direction)
 {
@@ -2679,173 +2513,139 @@ u8 GetAdjustedInitialTransitionFlags(struct InitialPlayerAvatarState *playerStru
 		return PLAYER_AVATAR_FLAG_ON_FOOT;
 }
 
-#ifdef MB_UNDERGROUND_MINING
-#define TAG_MINING_SCAN_RING 0x27DB //ANIM_TAG_THIN_RING
-void SpriteCB_MiningScanRing(struct Sprite* sprite)
+void WarpFadeOutScreen(void)
 {
-	if (sprite->affineAnimEnded)
-	{
-		FreeSpriteTilesByTag(sprite->template->tileTag);
-		FreeSpritePaletteByTag(sprite->template->paletteTag);
-		FreeSpriteOamMatrix(sprite);
-		DestroyAnimSprite(sprite);
-	}
+    const struct MapHeader *header = GetDestinationWarpMapHeader();
+    if (header->regionMapSectionId != gMapHeader.regionMapSectionId && MapHasPreviewScreen(header->regionMapSectionId, MPS_TYPE_CAVE))
+        FadeScreen(FADE_TO_BLACK, 0);
+    else
+    {
+        switch (MapTransitionIsEnter(GetCurrentMapType(), header->mapType))
+        {
+        case FALSE:
+            FadeScreen(FADE_TO_BLACK, 0);
+            break;
+        case TRUE:
+			gDontFadeWhite = TRUE; //Prevent DNS issues at night
+            FadeScreen(FADE_TO_WHITE, 0);
+            break;
+        }
+    }
 }
 
-static const struct OamData sMiningScanRing =
+//Stuff to do with pressing buttons in the field//
+void FieldCheckIfPlayerPressedLButton(struct FieldInput* input, u16 newKeys)
 {
-	.affineMode = ST_OAM_AFFINE_DOUBLE,
-	.objMode = ST_OAM_OBJ_NORMAL,
-	.shape = SPRITE_SHAPE(64x64),
-	.size = SPRITE_SIZE(64x64),
-	.priority = 0, //Above all
-};
-
-static const union AffineAnimCmd sMiningScanRingAffineAnimCmds[] =
-{
-	AFFINEANIMCMD_FRAME(0x10, 0x10, 0, 0),
-	AFFINEANIMCMD_FRAME(0xB, 0xB, 0, 45),
-	AFFINEANIMCMD_END,
-};
-
-static const union AffineAnimCmd *const sMiningScanRingAffineAnimTable[] =
-{
-	sMiningScanRingAffineAnimCmds,
-};
-
-static const struct SpriteTemplate sMiningScanRingSpriteTemplate =
-{
-	.tileTag = TAG_MINING_SCAN_RING, 
-	.paletteTag = TAG_MINING_SCAN_RING,
-	.oam = &sMiningScanRing,
-	.anims = gDummySpriteAnimTable,
-	.images = NULL,
-	.affineAnims = sMiningScanRingAffineAnimTable,
-	.callback = SpriteCB_MiningScanRing,
-};
-
-static u8 GetNumMiningSpots(void)
-{
-	u16 width = gMapHeader.mapLayout->width;
-	u16 height = gMapHeader.mapLayout->height;
-	return MathMax(1, (width * height) / 1000); //One possible tile per every 1000sq blocks
+	if (newKeys & L_BUTTON)
+		input->pressedLButton = TRUE;
 }
 
-void TryLoadMiningSpots(void)
+bool8 ProcessNewFieldPlayerInput(struct FieldInput* input)
 {
-	if (gMiningSpots[0].x == 0 && gMiningSpots[0].y == 0) //Data wasn't set yet
+	if (input->pressedSelectButton && UseRegisteredKeyItemOnField())
+    {
+        gInputToStoreInQuestLogMaybe.pressedSelectButton = TRUE;
+        return TRUE;
+    }
+
+	if (input->pressedLButton && StartLButtonFunc())
 	{
-		u16 counter, total, width, height;
-		width = gMapHeader.mapLayout->width;
-		height = gMapHeader.mapLayout->height;
-		total = GetNumMiningSpots();
-		counter = 0;
-
-		do
-		{
-			//Choose random spot
-			s16 x = Random() % width + 7;
-			s16 y = Random() % height + 7;
-			u8 metatileBehavior = MapGridGetMetatileBehaviorAt(x, y);
-			
-			//Make sure correct type of spot
-			if (metatileBehavior == MB_UNDERGROUND_MINING)
-			{
-				//Check access in any direction
-				for (u8 dir = DIR_SOUTH; dir <= DIR_EAST; ++dir)
-				{
-					s16 xCopy = x;
-					s16 yCopy = y;
-					MoveCoords(dir, &xCopy, &yCopy);
-					
-					if (!MapGridIsImpassableAt(xCopy, yCopy))
-					{
-						//Good spot
-						gMiningSpots[counter].x = x;
-						gMiningSpots[counter++].y = y;
-						break;
-					}
-				}
-			}
-
-		} while (counter < total);
-	}
-}
-
-void ChooseMiningSpotToShow(void)
-{
-	u32 i, total, bestId, lowestDist;
-	total = GetNumMiningSpots();
-
-	for (i = 0, bestId = 0, lowestDist = 0xFFFFFFFF; i < total; ++i)
-	{
-		u32 distance = GetPlayerDistance(gMiningSpots[i].x, gMiningSpots[i].y);
-		if (distance < lowestDist) //Closer spot
-		{
-			bestId = i;
-			lowestDist = distance;
-		}
+		gInputToStoreInQuestLogMaybe.pressedRButton = TRUE;
+		return TRUE;
 	}
 
-	//Set up sparkle field effect
-	gFieldEffectArguments[0] = gMiningSpots[bestId].x - 7;
-	gFieldEffectArguments[1] = gMiningSpots[bestId].y - 7;
-	gFieldEffectArguments[2] = 2; //Priority
-}
-
-bool8 IsValidMiningSpot(s16 x, s16 y)
-{
-	u32 i;
-	u32 total = GetNumMiningSpots();
-
-	for (i = 0; i < total; ++i)
+	if (input->pressedRButton && StartRButtonFunc())
 	{
-		if (gMiningSpots[i].x == x && gMiningSpots[i].y == y)
-			return TRUE;
+		gInputToStoreInQuestLogMaybe.pressedRButton = TRUE;
+		return TRUE;
 	}
-	
+
 	return FALSE;
 }
 
-#endif
-
-void ResetMiningSpots(void)
+void UseRegisteredItem(u16 registeredItem)
 {
-	Memset(gMiningSpots, 0, sizeof(gMiningSpots));
+	u8 taskId;
+
+	ScriptContext2_Enable();
+	FreezeEventObjects();
+	HandleEnforcedLookDirectionOnPlayerStopMoving();
+	StopPlayerAvatar();
+	Var800E = registeredItem;
+	taskId = CreateTask(ItemId_GetFieldFunc(registeredItem), 8);
+	if (taskId != 0xFF)
+		gTasks[taskId].data[3] = 1;
 }
 
-void IsBestMiningSpotOutOfView(void)
+static bool8 UseRegisteredKeyItemOnField(void)
 {
-	#ifdef MB_UNDERGROUND_MINING
-	s16 left =   gSaveBlock1->pos.x - 2;
-	s16 right =  gSaveBlock1->pos.x + 17;
-	s16 top =    gSaveBlock1->pos.y;
-	s16 bottom = gSaveBlock1->pos.y + 16;
-	s16 x = gFieldEffectArguments[0] + 7;
-	s16 y = gFieldEffectArguments[1] + 7;
+	u8 i, numRegisteredItems;
+	u16 registeredItem;
 
-	gSpecialVar_LastResult = FALSE;
-	if (x >= left && x <= right && y >= top && y <= bottom)
-		return; //In view
-
-	gSpecialVar_LastResult = TRUE;
+	if (InUnionRoom()
+	#ifdef FLAG_SYS_BAG_HIDE
+	|| FlagGet(FLAG_SYS_BAG_HIDE) //Can't use item with no bag
 	#endif
+	)
+		return FALSE;
+
+	DismissMapNamePopup();
+	ChangeBgY(0, 0, 0);
+
+	for (i = 0, numRegisteredItems = 0, registeredItem = ITEM_NONE; i < REGISTERED_ITEM_COUNT; ++i)
+	{
+		if (gSaveBlock1->registeredItems[i] != ITEM_NONE)
+		{
+			registeredItem = gSaveBlock1->registeredItems[i];
+			if (CheckBagHasItem(registeredItem, 1) == 0)
+				gSaveBlock1->registeredItems[i] = ITEM_NONE; //Don't have item so remove it from list
+			else
+			{
+				gMultiChoice[numRegisteredItems].name = ItemId_GetName(gSaveBlock1->registeredItems[i]);
+				gMultiChoice[numRegisteredItems].id = numRegisteredItems;
+				numRegisteredItems++;
+			}
+
+			CompactRegisteredItems();
+		}
+	}
+
+	if (registeredItem != ITEM_NONE)
+	{
+		if (numRegisteredItems == 1) //Only 1 item registered
+		{
+			if (CheckBagHasItem(registeredItem, 1) > 0)
+			{
+				UseRegisteredItem(registeredItem);
+				return TRUE;
+			}
+
+			RemoveRegisteredItem(registeredItem);
+		}
+		else //Pull up list offering multiple items
+		{
+			Var8004 = numRegisteredItems;
+			ScriptContext1_SetupScript(EventScript_ShowSelectItems);
+			return TRUE;
+		}
+	}
+
+	ScriptContext1_SetupScript(EventScript_BagItemCanBeRegistered);
+	return TRUE;
 }
 
-extern const struct CompressedSpriteSheet gThinRingSpriteSheet;
-extern const struct CompressedSpritePalette gThinRingSpritePalette;
-void CreateMiningScanRing(void)
+void Task_UseChosenRegisteredItem(u8 taskId)
 {
-	#ifdef MB_UNDERGROUND_MINING
-	LoadCompressedSpriteSheetUsingHeap(&gThinRingSpriteSheet);
-	LoadCompressedSpritePaletteUsingHeap(&gThinRingSpritePalette);
-	CreateSprite(&sMiningScanRingSpriteTemplate, 120, 80, 0);
-	
-	//Blend the palette a light blue
-	u16 paletteOffset = IndexOfSpritePaletteTag(TAG_MINING_SCAN_RING) * 16 + 16 * 16;
-	BlendPalette(paletteOffset, 16, 0x10, 0x5F72); //Light greenish
-	CpuCopy32(gPlttBufferFaded + paletteOffset, gPlttBufferUnfaded + paletteOffset, 32);
-	#endif
+	if (!ScriptContext2_IsEnabled())
+	{
+		UseRegisteredItem(gSaveBlock1->registeredItems[gSpecialVar_LastResult]);
+		DestroyTask(taskId);
+	}
+}
+
+void UseChosenRegisteredItem(void)
+{
+	CreateTask(Task_UseChosenRegisteredItem, 0xFF);
 }
 
 #ifdef GEN_4_PLAYER_RUNNING_FIX

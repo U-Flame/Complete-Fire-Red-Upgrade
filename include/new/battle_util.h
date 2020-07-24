@@ -114,7 +114,9 @@ bool8 BankSideHasSeaOfFire(u8 bank);
 bool8 BankSideHasRainbow(u8 bank);
 bool8 BankSideHasSwamp(u8 bank);
 bool8 SideHasSwamp(u8 side);
+bool8 BankSideHasGMaxVineLash(u8 bank);
 bool8 BankSideHasGMaxWildfire(u8 bank);
+bool8 BankSideHasGMaxCannonade(u8 bank);
 bool8 BankSideHasGMaxVolcalith(u8 bank);
 bool8 IsConfused(u8 bank);
 bool8 IsTaunted(u8 bank);
@@ -131,6 +133,7 @@ void EmitDataTransfer(u8 bufferId, void* dst, u16 size, void* data);
 
 //Functions Hooked In
 void ClearTemporarySpeciesSpriteData(u8 bank, bool8 dontClearSubstitute);
+u16 TryFixDynamaxTransformSpecies(u8 bank, u16 species);
 
 //Exported Constants
 enum {IN_AIR, GROUNDED};

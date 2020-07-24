@@ -401,7 +401,7 @@ u8 __attribute__((long_call)) sub_80A8364(u8);
 void __attribute__((long_call)) StoreSpriteCallbackInData6(struct Sprite *sprite, void (*spriteCallback)(struct Sprite*));
 void __attribute__((long_call)) SetCallbackToStoredInData6(struct Sprite *sprite);
 void __attribute__((long_call)) oamt_add_pos2_onto_pos1(struct Sprite *sprite);
-u8 __attribute__((long_call)) GetBankSpriteDefault_Y(u8 bank);
+u8 __attribute__((long_call)) GetBattlerSpriteDefault_Y(u8 bank);
 u8 __attribute__((long_call)) sub_80A82E4(u8 bank);
 u8 __attribute__((long_call)) GetSubstituteSpriteDefault_Y(u8 bank);
 void __attribute__((long_call)) SetAnimSpriteInitialXOffset(struct Sprite *sprite, s16 xOffset);
@@ -440,6 +440,8 @@ u8 __attribute__((long_call)) LaunchBallFadeMonTask(bool8 unFadeLater, u8 bank, 
 void __attribute__((long_call)) SpriteCB_ThrowBallMovement(struct Sprite *sprite);
 void __attribute__((long_call)) CompleteOnSpecialAnimDone(void);
 bool8 __attribute__((long_call)) CreateShockWaveLightning(struct Task *task, u8 taskId);
+u8 __attribute__((long_call)) CreateMonPicBattleAnim(u16 species, bool8 isBackpic, u8 a3, s16 x, s16 y, u8 subpriority, u32 personality, u32 trainerId, u32 battlerId, u32 a10);
+void __attribute__((long_call)) TranslateSpriteLinearFixedPoint(struct Sprite *sprite);
 
 // battle_anim_80A9C70.s
 #define STAT_ANIM_PLUS1  15

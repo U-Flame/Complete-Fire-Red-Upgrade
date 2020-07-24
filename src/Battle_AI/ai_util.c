@@ -30,6 +30,7 @@ ai_util.c
 
 //This file's functions:
 static u32 CalcPredictedDamageForCounterMoves(u16 move, u8 bankAtk, u8 bankDef);
+static bool8 CalculateMoveKnocksOutXHits(u16 move, u8 bankAtk, u8 bankDef, u8 numHits);
 
 bool8 CanKillAFoe(u8 bank)
 {
@@ -187,7 +188,7 @@ bool8 CanKnockOutAfterHealing(u8 bankAtk, u8 bankDef, u16 healAmount, u8 numHits
 
 		if (!(gBitTable[i] & moveLimitations))
 		{
-			if (MoveKnocksOutXHits(move, bankAtk, bankDef, numHits))
+			if (CalculateMoveKnocksOutXHits(move, bankAtk, bankDef, numHits)) //Need fresh calculation since data is locked earlier
 			{
 				gBattleMons[bankDef].hp = backupHp;
 				return TRUE;
@@ -903,8 +904,16 @@ u16 CalcFinalAIMoveDamageFromParty(u16 move, struct Pokemon* monAtk, u8 bankDef,
 
 static u32 CalcPredictedDamageForCounterMoves(u16 move, u8 bankAtk, u8 bankDef)
 {
-	u16 predictedMove = GetStrongestMove(bankDef, bankAtk); //Get the strongest move as the predicted move
+	u16 predictedMove;
 	u32 predictedDamage = 0;
+	
+	if (AI_SpecialTypeCalc(move, bankAtk, bankDef) & MOVE_RESULT_NO_EFFECT)
+		return 0; //These moves are subject to immunities
+
+	if (gNewBS->ai.strongestMove[bankDef][bankAtk] != 0xFFFF) //Don't force calculation here - can cause infinite loop if both Pokemon have a counter move
+		predictedMove = GetStrongestMove(bankDef, bankAtk); //Get the strongest move as the predicted move
+	else
+		predictedMove = IsValidMovePrediction(bankDef, bankAtk);
 
 	if (predictedMove != MOVE_NONE && SPLIT(predictedMove) != SPLIT_STATUS && !MoveBlockedBySubstitute(predictedMove, bankDef, bankAtk))
 	{
@@ -1291,7 +1300,10 @@ u16 GetBattleMonMove(u8 bank, u8 i)
 	#endif
 
 	if (IsDynamaxed(bank))
+	{
+		gNewBS->ai.zMoveHelper = move; //Store the original move in memory for damage calcs later
 		move = GetMaxMove(bank, i);
+	}
 
 	return move;
 }
@@ -1374,7 +1386,9 @@ bool8 IsTakingSecondaryDamage(u8 bank)
 		||  ((gBattleMons[bank].status1 & STATUS1_SLEEP) > 1 && gBattleMons[bank].status2 & STATUS2_NIGHTMARE)
 		||  gBattleMons[bank].status2 & (STATUS2_CURSED | STATUS2_WRAPPED)
 		||	(BankSideHasSeaOfFire(bank) && !IsOfType(bank, TYPE_FIRE))
+		||  (BankSideHasGMaxVineLash(bank) && !IsOfType(bank, TYPE_GRASS))
 		||  (BankSideHasGMaxWildfire(bank) && !IsOfType(bank, TYPE_FIRE))
+		||  (BankSideHasGMaxCannonade(bank) && !IsOfType(bank, TYPE_WATER))
 		||  BankSideHasGMaxVolcalith(bank))
 			return TRUE;
 	}
@@ -1410,7 +1424,9 @@ bool8 WillFaintFromSecondaryDamage(u8 bank)
 		+  GetBurnDamage(bank)
 		+  GetCurseDamage(bank)
 		+  GetSeaOfFireDamage(bank) //Sea of Fire runs on last turn
+		+  GetGMaxVineLashDamage(bank)
 		+  GetGMaxWildfireDamage(bank)
+		+  GetGMaxCannonadeDamage(bank)
 		+  GetGMaxVolcalithDamage(bank) >= hp)
 			return TRUE;
 	}
@@ -1485,6 +1501,7 @@ bool8 BadIdeaToPutToSleep(u8 bankDef, u8 bankAtk)
 	u8 defAbility = ABILITY(bankDef);
 
 	return !CanBePutToSleep(bankDef, TRUE)
+		|| gStatuses3[bankDef] & STATUS3_YAWN
 		|| defItemEffect == ITEM_EFFECT_CURE_SLP
 		|| defItemEffect == ITEM_EFFECT_CURE_STATUS
 		|| defAbility == ABILITY_EARLYBIRD
@@ -2440,7 +2457,7 @@ static bool8 ShouldAIFreeChoiceLockWithDynamax(u8 bankAtk, u8 bankDef)
 
 			if (!(gBitTable[i] & moveLimitations))
 			{
-				if (AI_Script_Negatives(bankAtk, bankDef, move, 100, &aiScriptData) >= 100)
+				if (AIScript_Negatives(bankAtk, bankDef, move, 100, &aiScriptData) >= 100)
 					return TRUE;
 			}
 		}
@@ -2474,7 +2491,7 @@ static bool8 CalcOnlyBadMovesLeftInMoveset(u8 bankAtk, u8 bankDef)
 
 		if (!(gBitTable[i] & moveLimitations))
 		{
-			viability = AI_Script_Negatives(bankAtk, bankDef, move, 100, &aiScriptData);
+			viability = AIScript_Negatives(bankAtk, bankDef, move, 100, &aiScriptData);
 			if (viability >= 100)
 			{
 				if (SPLIT(move) == SPLIT_STATUS)
@@ -2598,8 +2615,10 @@ bool8 OnlyBadMovesLeftInMoveset(u8 bankAtk, u8 bankDef)
 
 u16 TryReplaceMoveWithZMove(u8 bankAtk, u8 bankDef, u16 move)
 {
+	if (IsAnyMaxMove(move))
+		return move;
+
 	if (!gNewBS->zMoveData.used[bankAtk] && SPLIT(move) != SPLIT_STATUS
-	&& !IsAnyMaxMove(move)
 	&& ShouldAIUseZMove(bankAtk, bankDef, move))
 	{
 		u8 moveIndex = FindMovePositionInMoveset(move, bankAtk);
@@ -2620,7 +2639,10 @@ u16 TryReplaceMoveWithZMove(u8 bankAtk, u8 bankDef, u16 move)
 
 		u16 maxMove = GetMaxMoveByMove(bankAtk, move);
 		if (maxMove != MOVE_NONE)
+		{
+			gNewBS->ai.zMoveHelper = move; //Store the original move in memory for damage calcs later
 			move = maxMove;
+		}
 	}
 
 	return move;
@@ -2680,7 +2702,15 @@ u8 GetAIMoveEffectForMaxMove(u16 move, u8 bankAtk, u8 bankDef)
 				moveEffect = EFFECT_SET_TERRAIN;
 			break;
 
+		case MAX_EFFECT_VINE_LASH:
+			//TODO AI
+			break;
+
 		case MAX_EFFECT_WILDFIRE:
+			//TODO AI
+			break;
+
+		case MAX_EFFECT_CANNONADE:
 			//TODO AI
 			break;
 
@@ -2962,7 +2992,8 @@ bool8 ShouldAIUseZMove(u8 bankAtk, u8 bankDef, u16 move)
 
 			if (IsRaidBattle() && gNewBS->dynamaxData.raidShieldsUp && SIDE(bankAtk) == B_SIDE_PLAYER && SIDE(bankDef) == B_SIDE_OPPONENT) //Partner AI on Raid Pokemon with shields up
 			{
-				if (gNewBS->dynamaxData.shieldCount - gNewBS->dynamaxData.shieldsDestroyed >= 2)
+				if (gNewBS->dynamaxData.shieldCount - gNewBS->dynamaxData.shieldsDestroyed <= 2 //Less than 3 shields left
+				&& gNewBS->dynamaxData.stormLevel < 3) //The Raid boss hasn't almost won
 					return FALSE; //Don't waste a Z-Move breaking a shield
 
 				u16 bankAtkPartner = PARTNER(bankAtk);
@@ -3080,6 +3111,8 @@ bool8 ShouldAIUseZMove(u8 bankAtk, u8 bankDef, u16 move)
 	2. Weather Boosting Ability
 	3. Choice Item
 	4. Weakness Policy
+	
+	Gigantamax gives +1 to all of the above
 */
 static bool8 MonCanTriggerWeatherAbilityWithMaxMove(struct Pokemon* mon)
 {
@@ -3190,6 +3223,9 @@ void CalcAIDynamaxMon(u8 bank)
 			else if (bestMonStat > 0 //Has an actual attacking move
 			&& itemEffect != ITEM_EFFECT_EJECT_BUTTON && itemEffect != ITEM_EFFECT_EJECT_PACK) //And probably won't be forced out by its item
 				updateScore = 1;
+
+			if (MoveInMonMovesetThatCanChangeByGigantamaxing(mon))
+				++updateScore; //This is even better
 
 			if (updateScore >= bestMonScore)
 			{

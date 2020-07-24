@@ -10,8 +10,10 @@
 #include "../include/start_menu.h"
 #include "../include/party_menu.h"
 #include "../include/constants/region_map_sections.h"
+#include "../include/constants/songs.h"
 
 #include "../include/new/dexnav.h"
+#include "../include/new/item.h"
 #include "../include/new/overworld.h"
 #include "../include/new/read_keys.h"
 #include "../include/new/util.h"
@@ -40,6 +42,7 @@ void InitKeys(void)
 #define gKeyRepeatContinueDelay 5
 #define gKeyRepeatStartDelay 40
 
+extern const u8 EventScript_SecondBagItemCanBeRegisteredToL[];
 extern const u8 SystemScript_EnableAutoRun[];
 extern const u8 SystemScript_DisableAutoRun[];
 extern const u8 SystemScript_EnableBikeTurboBoost[];
@@ -102,20 +105,21 @@ static u16 TryIgnoringKeys(u8 keyFlag, u16 currKeys)
 // hook at 080005e8 via r0
 void ReadKeys(void)
 {
+	u16 currKeys, keyInput, tryKey;
 	RtcCalcLocalTime(); //Called here for convenience
 
 	#ifdef SAVE_BLOCK_EXPANSION
-		u16 currKeys = gKeyReg;
-		u8 tryKey = gKeypadSetter->keyFlags;
-		if (tryKey != 0)
-		{
-			TryForcedScript(tryKey, currKeys);
-			currKeys = TryForcedKey(tryKey, currKeys);
-			currKeys = TryIgnoringKeys(tryKey, currKeys);
-		}
-		u16 keyInput = KEYS_MASK ^ currKeys;
+	currKeys = gKeyReg;
+	tryKey = gKeypadSetter->keyFlags;
+	if (tryKey != 0)
+	{
+		TryForcedScript(tryKey, currKeys);
+		currKeys = TryForcedKey(tryKey, currKeys);
+		currKeys = TryIgnoringKeys(tryKey, currKeys);
+	}
+	keyInput = KEYS_MASK ^ currKeys;
 	#else
-		u16 keyInput = REG_KEYINPUT ^ KEYS_MASK;
+	keyInput = REG_KEYINPUT ^ KEYS_MASK;
 	#endif
 	gMain.newKeysRaw = keyInput & ~gMain.heldKeysRaw;
 	gMain.newKeys = gMain.newKeysRaw;
@@ -143,10 +147,8 @@ void ReadKeys(void)
 	gMain.heldKeysRaw = keyInput;
 	gMain.heldKeys = gMain.heldKeysRaw;
 
-	bool8 inOverworld = FuncIsActiveTask(Task_WeatherMain);
-
 	// Remap L to A if the L=A option is enabled.
-	if (gSaveBlock2->optionsButtonMode == 2)
+	if (gSaveBlock2->optionsButtonMode == OPTIONS_BUTTON_MODE_L_EQUALS_A)
 	{
 		if (gMain.newKeys & L_BUTTON)
 			gMain.newKeys |= A_BUTTON;
@@ -154,15 +156,38 @@ void ReadKeys(void)
 		if (gMain.heldKeys & L_BUTTON)
 			gMain.heldKeys |= A_BUTTON;
 	}
-	else if (gMain.newKeys & L_BUTTON //Can't be used if L=A
-	&& !ScriptContext2_IsEnabled()
-	&& !IsDexNavHudActive()
-	&& inOverworld) //In the overworld
+
+	if (gMain.newKeys & gMain.watchedKeysMask)
+		gMain.watchedKeysPressed = TRUE;
+}
+
+bool8 StartLButtonFunc(void)
+{
+	if (IsDexNavHudActive())
+		return FALSE;
+
+	if (gSaveBlock2->optionsButtonMode == OPTIONS_BUTTON_MODE_SECOND_REGISTERED_ITEM)
+	{
+		u16 secondRegisteredItem = gSaveBlock1->registeredItems[1];
+		if (secondRegisteredItem != ITEM_NONE)
+		{
+			if (CheckBagHasItem(secondRegisteredItem, 1))
+			{
+				UseRegisteredItem(secondRegisteredItem);
+				return TRUE;
+			}
+			else 
+				RemoveRegisteredItem(secondRegisteredItem);
+		}
+
+		ScriptContext1_SetupScript(EventScript_SecondBagItemCanBeRegisteredToL);
+		return TRUE;
+	}
+	else if (gSaveBlock2->optionsButtonMode != OPTIONS_BUTTON_MODE_L_EQUALS_A)
 	{
 		#ifdef FLAG_BIKE_TURBO_BOOST
 		if (TestPlayerAvatarFlags(PLAYER_AVATAR_FLAG_BIKE))
 		{
-			ScriptContext2_Enable();
 			DismissMapNamePopup();
 
 			if (FlagGet(FLAG_BIKE_TURBO_BOOST))
@@ -175,6 +200,8 @@ void ReadKeys(void)
 				FlagSet(FLAG_BIKE_TURBO_BOOST);
 				ScriptContext1_SetupScript(SystemScript_EnableBikeTurboBoost);
 			}
+			
+			return TRUE;
 		}
 		else
 		#endif
@@ -196,62 +223,85 @@ void ReadKeys(void)
 				FlagSet(FLAG_AUTO_RUN);
 				ScriptContext1_SetupScript(SystemScript_EnableAutoRun);
 			}
+
+			return TRUE;
 			#endif
 		}
 	}
+	
+	return FALSE;
+}
 
-	if (gMain.newKeys & R_BUTTON
-	&& inOverworld
-	&& !ScriptContext2_IsEnabled()
-	&& !IsDexNavHudActive()
-	&& !InUnionRoom())
+bool8 StartRButtonFunc(void)
+{
+	if (IsDexNavHudActive() || InUnionRoom())
+		return FALSE;
+
+	u16 dexNavSpecies = VarGet(VAR_DEXNAV);
+
+	#ifndef VAR_R_BUTTON_MODE
+	if (dexNavSpecies != SPECIES_NONE)
 	{
-		u16 dexNavSpecies = VarGet(VAR_DEXNAV);
-
-		#ifndef VAR_R_BUTTON_MODE
-		if (dexNavSpecies != SPECIES_NONE)
-			InitDexNavHUD(dexNavSpecies & 0x7FFF, dexNavSpecies >> 15);
-		#else
-		switch (VarGet(VAR_R_BUTTON_MODE)) {
-			case OPTIONS_R_BUTTON_MODE_DEXNAV:
-				if (dexNavSpecies != SPECIES_NONE && FlagGet(FLAG_SYS_DEXNAV))
-					InitDexNavHUD(dexNavSpecies & 0x7FFF, dexNavSpecies >> 15);
-				break;
-			case OPTIONS_R_BUTTON_MODE_POKEMON_MENU:
-				if (!gPaletteFade->active && FlagGet(FLAG_SYS_POKEMON_GET))
-				{
-					ScriptContext2_Enable();
-					ScriptContext1_SetupScript(SystemScript_PartyMenuFromField);
-				}
-				break;
-			case OPTIONS_R_BUTTON_MODE_BAG:
-				if (!gPaletteFade->active && !FlagGet(FLAG_SYS_BAG_HIDE))
-				{
-					ScriptContext2_Enable();
-					ScriptContext1_SetupScript(SystemScript_ItemMenuFromField);
-				}
-				break;
-			case OPTIONS_R_BUTTON_MODE_MINING:
-				#ifdef MB_UNDERGROUND_MINING
-				if (GetCurrentRegionMapSectionId() == MAPSEC_KBT_EXPRESSWAY)
-				{
-					TryLoadMiningSpots();
-					ChooseMiningSpotToShow();
-					ScriptContext2_Enable();
-					ScriptContext1_SetupScript(SystemScript_MiningScan);
-				}
-				#endif
-				break;
-			case OPTIONS_R_BUTTON_MODE_DEBUG:
-				ScriptContext2_Enable();
-				ScriptContext1_SetupScript(SystemScript_DebugMenu);
-				break;
-		}
-		#endif
+		InitDexNavHUD(dexNavSpecies & 0x7FFF, dexNavSpecies >> 15);
+		return FALSE; //Don't enable the script context
 	}
+	#else
+	switch (VarGet(VAR_R_BUTTON_MODE)) {
+		case OPTIONS_R_BUTTON_MODE_DEXNAV:
+			if (dexNavSpecies != SPECIES_NONE && FlagGet(FLAG_SYS_DEXNAV))
+			{
+				InitDexNavHUD(dexNavSpecies & 0x7FFF, dexNavSpecies >> 15);
+				return FALSE; //Don't enable the script context
+			}
+			break;
+		case OPTIONS_R_BUTTON_MODE_POKEMON_MENU:
+			if (!gPaletteFade->active && FlagGet(FLAG_SYS_POKEMON_GET))
+			{
+				ScriptContext2_Enable();
+				ScriptContext1_SetupScript(SystemScript_PartyMenuFromField);
+				return TRUE;
+			}
+			break;
+		case OPTIONS_R_BUTTON_MODE_BAG:
+			if (!gPaletteFade->active && !FlagGet(FLAG_SYS_BAG_HIDE))
+			{
+				ScriptContext2_Enable();
+				ScriptContext1_SetupScript(SystemScript_ItemMenuFromField);
+				return TRUE;
+			}
+			break;
+		case OPTIONS_R_BUTTON_MODE_MISSION_LOG:
+			#ifdef FLAG_SYS_QUEST_LOG
+			if (!gPaletteFade->active && FlagGet(FLAG_SYS_QUEST_LOG))
+			{
+				PlaySE(SE_SELECT);
+				typedef void (*OpenQuestLogFromOverworld_T) (void);
+				#define OpenQuestLogFromOverworld ((OpenQuestLogFromOverworld_T) (0x801D770 |1))
+				OpenQuestLogFromOverworld();
+				return TRUE;
+			}
+			#endif
+			break;
+		case OPTIONS_R_BUTTON_MODE_MINING:
+			#ifdef MB_UNDERGROUND_MINING
+			if (GetCurrentRegionMapSectionId() == MAPSEC_KBT_EXPRESSWAY)
+			{
+				TryLoadMiningSpots();
+				ChooseMiningSpotToShow();
+				ScriptContext2_Enable();
+				ScriptContext1_SetupScript(SystemScript_MiningScan);
+				return TRUE;
+			}
+			#endif
+			break;
+		case OPTIONS_R_BUTTON_MODE_DEBUG:
+			ScriptContext2_Enable();
+			ScriptContext1_SetupScript(SystemScript_DebugMenu);
+			return TRUE;
+	}
+	#endif
 
-	if (gMain.newKeys & gMain.watchedKeysMask)
-		gMain.watchedKeysPressed = TRUE;
+	return FALSE;
 }
 
 void InitPartyMenuFromField(void)

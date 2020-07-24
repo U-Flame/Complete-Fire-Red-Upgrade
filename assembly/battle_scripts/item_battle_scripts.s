@@ -65,7 +65,6 @@ item_battle_scripts.s
 .global BattleScript_WeaknessBerryActivate
 
 .global BattleScript_CheekPouch
-.global BattleScript_MoveMissedCheckBlunderPolicy
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
@@ -464,11 +463,11 @@ BattleScript_EjectButton:
 	waitstateatk
 	switchhandleorder BANK_SWITCHING 0x2
 	returntoball BANK_SWITCHING
-	switch1 BANK_SWITCHING
-	switch2 BANK_SWITCHING
+	getswitchedmondata BANK_SWITCHING
+	switchindataupdate BANK_SWITCHING
 	hpthresholds BANK_SWITCHING
 	printstring 0x3
-	switch3 BANK_SWITCHING 0x1
+	switchinanim BANK_SWITCHING 0x1
 	waitstateatk
 	switchineffects BANK_SWITCHING
 	callasm SetNoMoreMovingThisTurnSwitchingBank @;New Pokemon can't attack after being switched in
@@ -568,6 +567,20 @@ BattleScript_WeaknessBerryActivate:
 	waitmessage DELAY_HALFSECOND
 	call BattleScript_CheekPouch
 	return
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+BattleScript_AIUseXstat:
+	printstring 304 @;STRINGID_EMPTYSTRING3
+	pause 48
+	playse 0x1 @;SE_USE_ITEM
+	printstring 343 @;STRINGID_TRAINER1USEDITEM
+	waitmessage DELAY_1SECOND
+	useitemonopponent
+	playanimation BANK_TARGET ANIM_STAT_BUFF ANIM_ARG_1
+	printfromtable 0x83FE57C @;gStatUpStringIds
+	waitmessage DELAY_1SECOND
+	finishaction
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 

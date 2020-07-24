@@ -76,7 +76,6 @@ u8 __attribute__((long_call)) GetRunningDirectionAnimNum(u8 direction);
 void __attribute__((long_call)) npc_apply_anim_looping(struct EventObject *eventObject, struct Sprite *sprite, u8 animNum);
 void __attribute__((long_call)) npc_apply_direction(struct EventObject *eventObject, struct Sprite *sprite, u8 direction, u8 speed);
 bool8 __attribute__((long_call)) npc_obj_ministep_stop_on_arrival(struct EventObject *eventObject, struct Sprite *sprite);
-void __attribute__((long_call)) sub_805C780(void);
 u8 __attribute__((long_call)) GetEventObjectIdByLocalIdAndMapInternal(u8 localId, u8 mapNum, u8 mapGroupId);
 u8 __attribute__((long_call)) GetEventObjectIdByLocalId(u8 localId);
 void __attribute__((long_call)) FaceDirection(struct EventObject *eventObject, struct Sprite *sprite, u8 direction);
@@ -114,6 +113,10 @@ u8 __attribute__((long_call)) GetWalkFastestMovementAction(u32);
 u8 __attribute__((long_call)) GetPlayerRunMovementAction(u32);
 u8 __attribute__((long_call)) GetJumpInPlaceMovementAction(u32);
 u8 __attribute__((long_call)) GetWalkInPlaceNormalMovementAction(u32);
+void __attribute__((long_call)) OverrideMovementTypeForEventObject(const struct EventObject* eventObject, u8 movementType);
+void __attribute__((long_call)) TryOverrideTemplateCoordsForEventObject(const struct EventObject* eventObject, u8 movementType);
+void __attribute__((long_call)) OverrideTemplateCoordsForEventObject(const struct EventObject* eventObject);
+u8 __attribute__((long_call)) GetTrainerFacingDirectionMovementType(u8 direction);
 
 /*
 extern const struct SpriteFrameImage gEventObjectPicTable_PechaBerryTree[];

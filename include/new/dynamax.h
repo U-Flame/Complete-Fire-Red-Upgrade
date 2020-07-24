@@ -16,6 +16,8 @@ bool8 CanGigantamax(u8 bank);
 const u8* GetDynamaxScript(u8 bank);
 void GigantamaxRevert(struct Pokemon* party);
 void TryRevertGigantamax(struct Pokemon* mon);
+void TryRevertBankGigantamax(u8 bank);
+u16 GetGigantamaxSpecies(u16 species, bool8 canGigantamax);
 u16 GetGigantamaxBaseForm(u16 species);
 bool8 DynamaxEnabled(u8 bank);
 bool8 HasBankDynamaxedAlready(u8 bank);
@@ -28,6 +30,8 @@ move_t GetMaxMove(u8 bank, u8 moveIndex);
 move_t GetMaxMoveByMove(u8 bank, u16 baseMove);
 bool8 MonCanUseMaxMoveWithEffect(struct Pokemon* mon, u8 maxEffect);
 bool8 MonCanDynamax(struct Pokemon* mon);
+bool8 MoveInMonMovesetThatCanChangeByGigantamaxing(struct Pokemon* mon);
+bool8 PlayerHasNoMonsLeftThatCanDynamax(void);
 u8 GetDynamaxHPBoost(u8 bank);
 u8 GetMonDynamaxHPBoost(struct Pokemon* mon);
 u8 GetRaidBattleHPBoost(void);
@@ -43,6 +47,7 @@ bool8 IsMaxMoveWithTrapDamageEffect(u16 move);
 bool8 IsMaxMoveWithEffect(u16 move, u8 effect);
 bool8 IsMaxGuardUp(u8 bank);
 bool8 ProtectedByMaxGuard(u8 bankDef, u16 move);
+void TryFadeBankPaletteForDynamax(u8 bank, u16 paletteOffset);
 
 bool8 IsRaidBattle(void);
 bool8 IsFrontierRaidBattle(void);
@@ -95,7 +100,9 @@ enum MaxMoveEffect
 	MAX_EFFECT_GRASSY_TERRAIN,
 	MAX_EFFECT_MISTY_TERRAIN,
 	MAX_EFFECT_PSYCHIC_TERRAIN,
+	MAX_EFFECT_VINE_LASH,
 	MAX_EFFECT_WILDFIRE,
+	MAX_EFFECT_CANNONADE,
 	MAX_EFFECT_EFFECT_SPORE_FOES,
 	MAX_EFFECT_PARALYZE_FOES,
 	MAX_EFFECT_CONFUSE_FOES_PAY_DAY,

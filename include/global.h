@@ -40,6 +40,7 @@
 #define Q_4_12(n)  ((s16)((n) * 4096))
 
 #define POKEMON_SLOTS_NUMBER 412
+#define ITEM_NAME_LENGTH 14
 #define POKEMON_NAME_LENGTH 10
 #define OT_NAME_LENGTH 7
 
@@ -127,9 +128,10 @@ enum
 
 enum
 {
-	OPTIONS_BUTTON_MODE_HELP,
+	OPTIONS_BUTTON_MODE_AUTO_RUN,
 	OPTIONS_BUTTON_MODE_LR,
-	OPTIONS_BUTTON_MODE_L_EQUALS_A
+	OPTIONS_BUTTON_MODE_L_EQUALS_A,
+	OPTIONS_BUTTON_MODE_SECOND_REGISTERED_ITEM,
 };
 
 enum
@@ -137,6 +139,7 @@ enum
 	OPTIONS_R_BUTTON_MODE_DEXNAV,
 	OPTIONS_R_BUTTON_MODE_POKEMON_MENU,
 	OPTIONS_R_BUTTON_MODE_BAG,
+	OPTIONS_R_BUTTON_MODE_MISSION_LOG,
 	OPTIONS_R_BUTTON_MODE_MINING,
 	OPTIONS_R_BUTTON_MODE_DEBUG,
 };
@@ -740,7 +743,7 @@ struct SaveBlock1 //0x202552C
 	/*0x0038*/ struct Pokemon playerParty[PARTY_SIZE];
 	/*0x0290*/ u32 money;
 	/*0x0294*/ u16 coins;
-	/*0x0296*/ u16 registeredItem; // registered for use with SELECT button
+	/*0x0296*/ u16 oldRegisteredItem; // was SELECT button item
 	/*0x0298*/ struct ItemSlot pcItems[PC_ITEMS_COUNT];
 	/*0x0310*/ u8 dexSeenFlags[(999 / 8) + 1]; //size = 125
 	/*0x038D*/ u8 dexCaughtFlags[(999 / 8) + 1];
@@ -778,7 +781,9 @@ struct SaveBlock1 //0x202552C
 	/*0x3AD4*/ u8 registeredTexts[UNION_ROOM_KB_ROW_COUNT][21];
 	/*0x3BA8*/ struct TrainerNameRecord trainerNameRecords[20];
 	/*0x3C98*/ struct DaycareMon route5DayCareMon;
-	/*0x3D24*/ u8 filler_3D24[0x10];
+	/*0x3D24*/ u16 registeredItems[6]; //For use with SELECT
+	/*0x3D30*/ u8 lastHealingSpot;
+	/*0x3D31*/ u8 filler_3D31[3];
 	/*0x3D34*/ u32 towerChallengeId;
 	/*0x3D38*/ struct TrainerTower trainerTower[NUM_TOWER_CHALLENGE_TYPES];
 };

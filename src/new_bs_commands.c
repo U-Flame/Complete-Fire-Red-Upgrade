@@ -17,6 +17,7 @@
 #include "../include/new/item.h"
 #include "../include/new/move_battle_scripts.h"
 #include "../include/new/move_tables.h"
+#include "../include/new/multi.h"
 #include "../include/new/new_bs_commands.h"
 #include "../include/new/set_effect.h"
 #include "../include/new/util.h"
@@ -913,6 +914,9 @@ void atkFF21_tryspectralthiefsteal(void)
 				success = TRUE;
 				gBattleMons[gBankTarget].statStages[i] -= 1;
 				gBattleMons[gBankAttacker].statStages[i] += increment;
+				
+				gNewBS->statFellThisTurn[gBankAttacker] = TRUE;
+				gNewBS->statFellThisRound[gBankAttacker] = TRUE;
 			}
 		}
 		else
@@ -923,8 +927,10 @@ void atkFF21_tryspectralthiefsteal(void)
 				gBattleMons[gBankTarget].statStages[i] -= 1;
 				gBattleMons[gBankAttacker].statStages[i] += increment;
 
-				if (gBattleMons[gBankAttacker].statStages[i] > 12)
-					gBattleMons[gBankAttacker].statStages[i] = 12;
+				if (gBattleMons[gBankAttacker].statStages[i] > STAT_STAGE_MAX)
+					gBattleMons[gBankAttacker].statStages[i] = STAT_STAGE_MAX;
+				
+				gNewBS->statRoseThisRound[gBankAttacker] = TRUE;
 			}
 		}
 	}
@@ -1151,9 +1157,10 @@ void atkFF23_faintpokemonaftermove(void)
 		else
 			gBattlescriptCurrInstr = BattleScript_FaintTarget;
 
-		if (SIDE(gActiveBattler) == B_SIDE_PLAYER)
+		if (SIDE(gActiveBattler) == B_SIDE_PLAYER
+		&& (!IsTagBattle() || GetBattlerPosition(gActiveBattler) == B_POSITION_OPPONENT_LEFT)) //Is player's mon
 		{
-			gHitMarker |= HITMARKER_x400000;
+			gHitMarker |= HITMARKER_PLAYER_FAINTED;
 			if (gBattleResults.playerFaintCounter < 0xFF)
 				gBattleResults.playerFaintCounter++;
 			AdjustFriendshipOnBattleFaint(gActiveBattler);
@@ -1853,10 +1860,10 @@ void atkFF2C_trysetpoison(void)
 		gBattlescriptCurrInstr += 6;
 }
 
-//addindicatorforplayerswitchineffects
-void atkFF2D_addindicatorforplayerswitchineffects(void) //Used for when the game asks you if you want to switch to counter what the foe is sending in
+//addindicatorforattackerswitchineffects
+void atkFF2D_addindicatorforattackerswitchineffects(void) //Used for when the game asks you if you want to switch to counter what the foe is sending in
 {
-	gNewBS->doSwitchInEffects |= gBitTable[GetBattlerAtPosition(B_POSITION_PLAYER_LEFT)];
+	gNewBS->doSwitchInEffects |= gBitTable[gBankAttacker];
 	gBattlescriptCurrInstr += 1;
 }
 
@@ -1962,4 +1969,16 @@ void atkFF34_canconfuse(void)
 		gMoveResultFlags |= MOVE_RESULT_DOESNT_AFFECT_FOE;
 		gBattlescriptCurrInstr = ptr;
 	}
+}
+
+//jumpifmaxchistrikecapped BANK FAIL_ADDRESS
+void atkFF35_jumpifmaxchistrikecapped(void)
+{
+	u8 bank = GetBankForBattleScript(gBattlescriptCurrInstr[1]);
+	u8* ptr = T1_READ_PTR(gBattlescriptCurrInstr + 2);
+
+	if (gNewBS->chiStrikeCritBoosts[bank] >= 3)
+		gBattlescriptCurrInstr = ptr;
+	else
+		gBattlescriptCurrInstr += 6;
 }
